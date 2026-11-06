@@ -1023,19 +1023,20 @@ function sci(x, digits = 3) {
 const SPECTRO_SOLUTIONS = {
   permanganate: { name: "Solution de permanganate de potassium (KMnO₄)", ion: "MnO₄⁻", color: "#7b1fa2",
     lambda: 530, kTrue: 2100, unit: "mol/L", unitFactor: 1,
-    concentrations: [0.00, 0.20e-3, 0.40e-3, 0.60e-3, 0.80e-3, 1.00e-3], unknownC: 0.55e-3 },
+    concentrations: [0, 0.10e-3, 0.20e-3, 0.30e-3, 0.40e-3, 0.50e-3], unknownC: 0.27e-3 },
   sulfate_cuivre: { name: "Solution de sulfate de cuivre (II) (CuSO₄)", ion: "Cu²⁺", color: "#1565c0",
     lambda: 800, kTrue: 12.5, unit: "mmol/L", unitFactor: 1e-3,
     concentrations: [0, 20, 40, 60, 80, 100], unknownC: 55 },
   bbt: { name: "Solution de bleu de bromothymol (BBT) en milieu basique", ion: "BBT²⁻", color: "#1e88e5",
-    lambda: 620, kTrue: 15.0, unit: "µmol/L", unitFactor: 1e-6,
+    lambda: 620, kTrue: 15000, unit: "µmol/L", unitFactor: 1e-6,
     concentrations: [0, 10, 20, 30, 40, 50], unknownC: 27 },
   dichromate: { name: "Solution de dichromate de potassium (K₂Cr₂O₇)", ion: "Cr₂O₇²⁻", color: "#e65100",
-    lambda: 450, kTrue: 380, unit: "µmol/L", unitFactor: 1e-6,
-    concentrations: [0, 5, 10, 15, 20, 25], unknownC: 13 }
+    lambda: 450, kTrue: 380, unit: "mmol/L", unitFactor: 1e-3,
+    concentrations: [0, 0.5, 1, 1.5, 2, 2.5], unknownC: 1.3 }
 };
 function trueAbsorbance(solKey, cValue) {
-  return SPECTRO_SOLUTIONS[solKey].kTrue * cValue;
+  const sp = SPECTRO_SOLUTIONS[solKey];
+  return sp.kTrue * cValue * sp.unitFactor; // A = ε·ℓ·C, C converti en mol/L
 }
 
 const LAMBDA = { Na: 50.1e-4, K: 73.5e-4, Cl: 76.3e-4, Cu2: 107.2e-4, SO4: 160.0e-4, Ca: 119.0e-4 };
@@ -1739,42 +1740,18 @@ function mixColors(c1, c2, t) {
 }
 
 function computePHExact(sys, V) {
-  const params = currentSystemParams;
-  const Ca = params.C_sample;
-  const Cb = params.titrantC;
-  const Va = params.vUnknown / 1000;
-  const Vb = V / 1000;
-  const Vtot = Va + Vb;
-  const nA = Ca * Va;
-  const nB = Cb * Vb;
-  const Kw = 1e-14;
-
-  if (sys.type === 'fort_fort') {
-    if (nB < nA - 1e-12) { const nH = nA - nB; return -Math.log10(nH / Vtot); }
-    else if (nB > nA + 1e-12) { const nOH = nB - nA; return 14 + Math.log10(nOH / Vtot); }
-    return 7;
-  } else if (sys.type === 'faible_fort') {
-    const Ka = sys.Ka;
-    if (V < simState.eqVol - 0.01) {
-      const nAH = nA - nB; const nAm = nB;
-      if (nAH <= 1e-12) { const Cb_eq = nAm / Vtot; const Kb = Kw / Ka; const x = Math.sqrt(Kb * Cb_eq); return 14 + Math.log10(x); }
-      const H = Ka * (nAH / nAm);
-      return -Math.log10(H);
-    } else if (V > simState.eqVol + 0.01) { const nOH = nB - nA; return 14 + Math.log10(nOH / Vtot); }
-    const Cb_eq = nA / Vtot; const Kb = Kw / Ka; const x = Math.sqrt(Kb * Cb_eq);
-    return 14 + Math.log10(x);
-  } else if (sys.type === 'faible_fort_inverse') {
-    const Ka = sys.Ka;
-    if (V < simState.eqVol - 0.01) {
-      const nB0 = nA - nB; const nBH = nB;
-      if (nB0 <= 1e-12) { const Cb_eq = nBH / Vtot; const H = Math.sqrt(Ka * Cb_eq); return -Math.log10(H); }
-      const Kb = Kw / Ka; const OH = Kb * (nB0 / nBH);
-      return 14 + Math.log10(OH);
-    } else if (V > simState.eqVol + 0.01) { const nH = nB - nA; return -Math.log10(nH / Vtot); }
-    const Cb_eq = nA / Vtot; const H = Math.sqrt(Ka * Cb_eq);
-    return -Math.log10(H);
+  // Résolution exacte du bilan de charges (bissection sur le pH)
+  const p = currentSystemParams, n = p.vUnknown + V;
+  const a = p.C_sample * p.vUnknown / n, b = p.titrantC * V / n;
+  const acidAnalyte = sys.type !== 'faible_fort_inverse';
+  const K = (sys.type === 'faible_fort' || sys.type === 'faible_fort_inverse') ? sys.Ka : 1e7;
+  let lo = -1, hi = 15;
+  for (let i = 0; i < 60; i++) {
+    const m = (lo + hi) / 2, h = Math.pow(10, -m);
+    const f = acidAnalyte ? b + h - 1e-14 / h - a * K / (K + h) : a * h / (K + h) + h - 1e-14 / h - b;
+    if (f > 0) lo = m; else hi = m;
   }
-  return 7;
+  return (lo + hi) / 2;
 }
 
 function computeSigmaExact(sys, V) {
@@ -1799,7 +1776,7 @@ function computeSigmaExact(sys, V) {
       const nOH = nB - nA; const nNa = nB; const nCl = nA;
       sigma = lamOH * (nOH / Vtot) + lamCl * (nCl / Vtot) + lamNa * (nNa / Vtot);
     }
-    return sigma * 10;
+    return sigma * 1e4; // λ (S·m²/mol) × c (mol/L) → mS/cm
   } else if (sys.type === 'precipitation') {
     let sigma = 0;
     if (nB <= nA) {
@@ -1809,7 +1786,7 @@ function computeSigmaExact(sys, V) {
       const nAg = nB - nA; const nNa = nA; const nNO3 = nB;
       sigma = lamAg * (nAg / Vtot) + lamNa * (nNa / Vtot) + lamNO3 * (nNO3 / Vtot);
     }
-    return sigma * 10;
+    return sigma * 1e4; // λ (S·m²/mol) × c (mol/L) → mS/cm
   }
   return 0;
 }
@@ -1827,7 +1804,8 @@ function drawTitrageCurve() {
   ctx.clearRect(0,0,W,H); ctx.fillStyle = '#fff'; ctx.fillRect(0,0,W,H);
   const xMax = simState.maxVol;
   const yMin = isPH ? 0 : 0;
-  const yMax = isPH ? 14 : 10;
+  let yMax = 14;
+  if (!isPH) { yMax = 0; for (let v = 0; v <= xMax; v += xMax / 100) yMax = Math.max(yMax, computeSigmaExact(sys, v)); yMax *= 1.1; }
   const xToPx = x => padL + (x/xMax) * plotW;
   const yToPx = y => H - padB - ((y-yMin)/(yMax-yMin)) * plotH;
 
