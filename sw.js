@@ -3,7 +3,7 @@
    © M.Belarbi — Tous droits réservés.
    ============================================================ */
 
-const CACHE_VERSION = 'labopc-v1.0.0';
+const CACHE_VERSION = 'labopc-v1.0.1';
 const CACHE_STATIC = `${CACHE_VERSION}-static`;
 const CACHE_RUNTIME = `${CACHE_VERSION}-runtime`;
 
