@@ -6,7 +6,7 @@
 <title>LABOPC — Laboratoire Virtuel</title>
 <meta name="theme-color" content="#2c5364">
 <link rel="manifest" href="manifest.json">
-<link rel="apple-touch-icon" href="icon/apple-touch-icon.png">
+<link rel="apple-touch-icon" href="icons/apple-touch-icon.png">
 <style>
   :root {
     --bg-dark: #0f2027; --bg-mid: #203a43; --bg-light: #2c5364;
@@ -31,20 +31,37 @@
   @keyframes fadeIn { from { opacity: 0; transform: translateY(8px);} to {opacity:1; transform:translateY(0);} }
   h2 { color: var(--bg-dark); margin-bottom: 18px; font-size: 1.3rem; border-bottom: 3px solid var(--bg-light); padding-bottom: 8px; }
   h3 { color: var(--bg-light); margin: 18px 0 12px; font-size: 1.05rem; }
+  
+  /* Accueil */
+  .home-hero { display: grid; grid-template-columns: 1fr 1fr; gap: 20px; margin-top: 20px; }
+  .hero-card { border-radius: 16px; padding: 40px 20px; text-align: center; cursor: pointer; transition: transform 0.3s, box-shadow 0.3s; color: white; position: relative; overflow: hidden; }
+  .hero-card:hover { transform: translateY(-5px); box-shadow: 0 15px 30px rgba(0,0,0,0.2); }
+  .hero-card.physique { background: linear-gradient(135deg, #2980b9, #2c3e50); }
+  .hero-card.chimie { background: linear-gradient(135deg, #11998e, #38ef7d); }
+  .hero-card .icon { font-size: 4rem; margin-bottom: 15px; position: relative; z-index: 2; }
+  .hero-card .title { font-size: 1.8rem; font-weight: 700; position: relative; z-index: 2; }
+  .hero-card .desc { font-size: 1rem; opacity: 0.9; margin-top: 5px; position: relative; z-index: 2; }
+
   .choices { display: grid; grid-template-columns: repeat(auto-fit, minmax(220px, 1fr)); gap: 15px; margin-top: 20px; }
   .card { background: var(--card-bg); border: 2px solid var(--border); border-radius: 12px; padding: 20px; cursor: pointer; transition: all 0.25s; text-align: center; }
   .card:hover { transform: translateY(-4px); border-color: var(--bg-light); box-shadow: 0 8px 20px rgba(44,83,100,0.25); background: #eaf4fa; }
   .card .icon { font-size: 2.5rem; margin-bottom: 10px; }
   .card .title { font-weight: 600; color: var(--bg-dark); margin-bottom: 4px; font-size: 1.1rem; }
   .card .desc { font-size: 0.85rem; color: var(--text-muted); }
+  
+  /* Boutons */
   .btn { background: var(--bg-light); color: white; border: none; padding: 10px 22px; border-radius: 8px; cursor: pointer; font-size: 0.95rem; font-weight: 600; transition: background 0.2s; margin: 5px; }
   .btn:hover { background: var(--bg-dark); }
   .btn.secondary { background: #6c757d; }
   .btn.success { background: var(--accent-dark); }
   .btn.success:hover { background: #0d7a6f; }
   .btn.danger { background: #c0392b; }
+  .btn.print { background: #5e35b1; }
+  .btn.print:hover { background: #4527a0; }
   .btn:disabled { opacity: 0.5; cursor: not-allowed; }
   .back-bar { margin-bottom: 18px; display: flex; justify-content: space-between; align-items: center; flex-wrap: wrap; gap: 8px; }
+
+  /* Tableaux & Boîtes */
   table { width: 100%; border-collapse: collapse; margin: 12px 0; font-size: 0.9rem; }
   th, td { border: 1px solid var(--border); padding: 8px 10px; text-align: center; }
   th { background: var(--bg-light); color: white; font-weight: 600; }
@@ -53,6 +70,8 @@
   .result-box { background: linear-gradient(90deg, #d4f5e9, #b8ecdd); border: 2px solid var(--accent-dark); padding: 18px; border-radius: 10px; margin-top: 18px; }
   .result-box .big { font-size: 1.4rem; font-weight: 700; color: #0d7a6f; margin: 6px 0; }
   .warning-box { background: #fff3cd; border-left: 4px solid #f0ad4e; padding: 12px 16px; border-radius: 6px; margin: 15px 0; font-size: 0.9rem; }
+
+  /* Simu */
   canvas { max-width: 100%; background: #fff; border: 1px solid var(--border); border-radius: 8px; margin: 10px 0; display: block; }
   .sim-layout { display: flex; gap: 30px; align-items: flex-start; flex-wrap: wrap; justify-content: center; margin: 20px 0; }
   .montage-frame { background: linear-gradient(180deg, #f0f4f8 0%, #dce5ee 100%); border-radius: 14px; padding: 20px 30px; box-shadow: inset 0 0 30px rgba(0,0,0,0.06), 0 4px 12px rgba(0,0,0,0.08); }
@@ -63,25 +82,32 @@
   .input-group label { font-weight: 600; color: var(--bg-dark); }
   .input-group input { padding: 8px 12px; border: 2px solid var(--border); border-radius: 8px; font-size: 0.95rem; width: 120px; }
   .method-badge { display: inline-block; padding: 4px 14px; border-radius: 20px; font-size: 0.8rem; font-weight: 600; margin-bottom: 10px; background: #e3f2fd; color: #1565c0; }
+
+  /* Démarches détaillées */
+  .steps-container { background: #f8fafc; border: 2px solid var(--bg-light); border-radius: 12px; padding: 20px 24px; margin-top: 18px; }
+  .steps-container h3 { color: var(--bg-dark); margin: 0 0 16px 0; font-size: 1.15rem; border-bottom: 2px solid var(--bg-light); padding-bottom: 10px; }
+  .step-item { display: flex; gap: 14px; margin-bottom: 16px; align-items: flex-start; }
+  .step-number { flex-shrink: 0; width: 32px; height: 32px; border-radius: 50%; background: var(--bg-light); color: white; display: flex; align-items: center; justify-content: center; font-weight: 700; font-size: 0.95rem; }
+  .step-body { flex: 1; }
+  .step-title { font-weight: 700; color: var(--bg-dark); margin-bottom: 6px; font-size: 0.95rem; }
+  .step-formula { font-family: 'Cambria Math', 'Times New Roman', serif; font-style: italic; font-size: 1.05rem; background: #eef4f8; border-left: 3px solid var(--bg-light); padding: 8px 14px; border-radius: 4px; margin: 6px 0; color: var(--bg-dark); overflow-x: auto; }
+  .step-calc { font-family: 'Courier New', monospace; font-size: 0.95rem; background: #fff8e1; border-left: 3px solid #e67e22; padding: 8px 14px; border-radius: 4px; margin: 6px 0; color: #333; }
+
   footer.app-footer { background: var(--bg-dark); color: #b8d4e0; text-align: center; padding: 14px 20px; font-size: 0.8rem; border-top: 3px solid var(--accent); }
   footer.app-footer .brand { color: var(--accent); font-weight: 700; }
-  @media (max-width: 640px) {
-    body { padding: 8px; }
-    .container { border-radius: 12px; }
-    header { padding: calc(54px + env(safe-area-inset-top)) 14px 18px; }
-    header h1 { font-size: 1.35rem; }
-    header .copyright-badge { top: 14px; right: 10px; font-size: .65rem; }
-    header .lang-switch { top: calc(10px + env(safe-area-inset-top)); left: 10px; }
-    main { padding: 18px 14px 28px; }
-    .choices { grid-template-columns: 1fr; gap: 10px; }
-    .card { padding: 16px; }
-    .sim-layout { gap: 14px; }
-    .montage-frame { max-width: 100%; padding: 12px; }
-    canvas { height: auto; }
-    table { display: block; overflow-x: auto; white-space: nowrap; }
-  }
-  button:focus-visible, .card:focus-visible, input:focus-visible, select:focus-visible {
-    outline: 3px solid #f0ad4e; outline-offset: 2px;
+
+  @media print {
+    body { background: #fff !important; padding: 0 !important; }
+    .container { box-shadow: none !important; border-radius: 0 !important; max-width: 100% !important; }
+    header, footer, .back-bar, .btn, .no-print { display: none !important; }
+    .screen { display: none !important; }
+    .screen.active { display: block !important; }
+    canvas { border: 1px solid #999 !important; page-break-inside: avoid; }
+    table { page-break-inside: auto; }
+    tr { page-break-inside: avoid; }
+    h2, h3 { color: #000 !important; border-color: #333 !important; }
+    .info-box, .result-box, .warning-box, .steps-container { background: #f4f4f4 !important; border: 1px solid #999 !important; box-shadow: none !important; page-break-inside: avoid; }
+    .step-formula, .step-calc { border: 1px solid #999 !important; background: #f9f9f9 !important; }
   }
 </style>
 </head>
@@ -100,21 +126,717 @@
   <footer class="app-footer"><div><span class="brand">LABOPC</span> by M.Belarbi</div></footer>
 </div>
 
-<script src="js/app-core.js"></script>
-<script src="js/mod-chimie.js"></script>
-<script src="js/mod-physique.js"></script>
 <script>
-  // Initialize only after the core and all activity modules are registered.
-  window.setLang = function(lang) { window.LABOPC_CORE.setLang(lang); };
-  window.LABOPC_CORE.init();
-
-  // Progressive Web App: register the worker only on HTTP(S) origins.
-  if ('serviceWorker' in navigator && (location.protocol === 'https:' || location.hostname === 'localhost')) {
-    window.addEventListener('load', function() {
-      navigator.serviceWorker.register('./sw.js', { scope: './' })
-        .catch(function(error) { console.error('LABOPC: service worker registration failed', error); });
-    });
+/* ============================================================
+   1. CORE & TRADUCTIONS
+   ============================================================ */
+const TRANSLATIONS = {
+  fr: { chooseLevel: "Choisissez votre niveau", premiere: "Première", terminale: "Terminale", chooseDomain: "Domaine", chooseActivity: "Activité", backHome: "← Accueil", backDomain: "← Domaines", backTheme: "← Thèmes", print: "🖨️ Imprimer",
+    domains: { chimie: "Chimie", physique: "Physique" },
+    activities: {
+      spectro: { title: "Spectrophotométrie", desc: "Dosage par étalonnage" }, conducto: { title: "Conductimétrie", desc: "Dosage par étalonnage" }, titrage: { title: "Titrages", desc: "pH, Conducto, Colorimétrie" },
+      dissolution: { title: "Dissolution / Dilution", desc: "Préparation de solutions" }, nomenclature: { title: "Nomenclature", desc: "Chimie organique" }, synthese: { title: "Synthèse Organique", desc: "Rendement" },
+      boyle: { title: "Loi de Boyle-Mariotte", desc: "Gaz" }, chute: { title: "Chute libre", desc: "Mécanique" }, diffraction: { title: "Diffraction", desc: "Ondes lumineuses" },
+      interferences: { title: "Interférences", desc: "Fentes de Young" }, doppler: { title: "Effet Doppler", desc: "Fréquence" }, lentille: { title: "Lentille mince", desc: "Optique" },
+      lunette: { title: "Lunette astronomique", desc: "Grossissement" }, venturi: { title: "Effet Venturi", desc: "Mécanique des fluides" }, archimede: { title: "Poussée d'Archimède", desc: "Flottabilité" }
+    }
+  },
+  en: { chooseLevel: "Choose your level", premiere: "11th Grade", terminale: "12th Grade", chooseDomain: "Domain", chooseActivity: "Activity", backHome: "← Home", backDomain: "← Domains", backTheme: "← Themes", print: "🖨️ Print",
+    domains: { chimie: "Chemistry", physique: "Physics" },
+    activities: {
+      spectro: { title: "Spectrophotometry", desc: "Calibration assay" }, conducto: { title: "Conductometry", desc: "Calibration assay" }, titrage: { title: "Titrations", desc: "pH, Conducto, Colorimetry" },
+      dissolution: { title: "Dissolution / Dilution", desc: "Solution preparation" }, nomenclature: { title: "Nomenclature", desc: "Organic chemistry" }, synthese: { title: "Organic Synthesis", desc: "Yield" },
+      boyle: { title: "Boyle-Mariotte Law", desc: "Gas" }, chute: { title: "Free Fall", desc: "Mechanics" }, diffraction: { title: "Diffraction", desc: "Light waves" },
+      interferences: { title: "Interferences", desc: "Young's slits" }, doppler: { title: "Doppler Effect", desc: "Frequency" }, lentille: { title: "Thin Lens", desc: "Optics" },
+      lunette: { title: "Telescope", desc: "Magnification" }, venturi: { title: "Venturi Effect", desc: "Fluid mechanics" }, archimede: { title: "Archimedes", desc: "Buoyancy" }
+    }
   }
+};
+
+let currentLang = 'fr', currentLevel = null, currentDomain = null;
+let activeCleanup = null;
+const appMain = document.getElementById('app-main');
+
+function t(key) { if (key.includes('.')) { const [s, p] = key.split('.'); return TRANSLATIONS[currentLang][s]?.[p] || key; } return TRANSLATIONS[currentLang][key] || key; }
+function setLang(lang) { currentLang = lang; document.getElementById('lang-fr').classList.toggle('active', lang === 'fr'); document.getElementById('lang-en').classList.toggle('active', lang === 'en'); renderLevels(); }
+function clearMain() { if (activeCleanup) { try { activeCleanup(); } catch(e){} activeCleanup = null; } appMain.innerHTML = ''; }
+
+function renderLevels() { 
+  clearMain(); 
+  appMain.innerHTML = `
+    <div class="screen active">
+      <h2 style="text-align:center; border:none;">${t('chooseLevel')}</h2>
+      <div class="choices" style="grid-template-columns: repeat(auto-fit, minmax(250px, 1fr));">
+        <div class="card" onclick="selectLevel('premiere')"><div class="icon">1️⃣</div><div class="title">${t('premiere')}</div></div>
+        <div class="card" onclick="selectLevel('terminale')"><div class="icon">2️⃣</div><div class="title">${t('terminale')}</div></div>
+      </div>
+    </div>
+  `; 
+}
+
+function selectLevel(level) { 
+  currentLevel = level; 
+  renderDisciplines();
+}
+
+function renderDisciplines() {
+  clearMain();
+  appMain.innerHTML = `
+    <div class="screen active">
+      <div class="back-bar"><button class="btn secondary" onclick="renderLevels()">${t('backHome')}</button></div>
+      <h2 style="text-align:center; border:none;">Choisissez une discipline</h2>
+      <div class="home-hero">
+        <div class="hero-card physique" onclick="selectDomain('physique')">
+          <div class="icon">⚛️</div>
+          <div class="title">Physique</div>
+          <div class="desc">Mécanique, ondes, optique, fluides</div>
+        </div>
+        <div class="hero-card chimie" onclick="selectDomain('chimie')">
+          <div class="icon">⚗️</div>
+          <div class="title">Chimie</div>
+          <div class="desc">Solutions, titrages, synthèse</div>
+        </div>
+      </div>
+    </div>
+  `;
+}
+
+function selectDomain(domain) { currentDomain = domain; renderActivities(); }
+
+function renderActivities() { 
+  clearMain(); 
+  const acts = Object.keys(REGISTRY).filter(k => REGISTRY[k].domain === currentDomain); 
+  let html = `<div class="screen active"><div class="back-bar"><button class="btn secondary" onclick="renderDisciplines()">${t('backHome')}</button></div><h2>${currentDomain === 'physique' ? '⚛️ Physique' : '⚗️ Chimie'} — ${t('chooseActivity')}</h2><div class="choices">`; 
+  acts.forEach(id => { 
+    const act = REGISTRY[id]; const actT = t('activities.' + id); 
+    html += `<div class="card" onclick="startActivity('${id}')"><div class="icon">${act.icon || '🔬'}</div><div class="title">${actT.title}</div><div class="desc">${actT.desc}</div></div>`; 
+  }); 
+  html += `</div></div>`; appMain.innerHTML = html; 
+}
+
+function startActivity(id) { 
+  const act = REGISTRY[id]; if (!act) return; 
+  clearMain(); 
+  const container = document.createElement('div'); container.className = 'screen active'; 
+  const backBtn = document.createElement('div'); backBtn.className = 'back-bar'; 
+  backBtn.innerHTML = `<button class="btn secondary no-print" onclick="renderActivities()">${t('backTheme')}</button><button class="btn print no-print" onclick="window.print()">${t('print')}</button>`; 
+  container.appendChild(backBtn); 
+  const title = document.createElement('h2'); title.innerHTML = `<span class="method-badge">${currentDomain === 'physique' ? 'Physique' : 'Chimie'}</span> ${t('activities.' + id).title}`; 
+  container.appendChild(title); 
+  const moduleDiv = document.createElement('div'); container.appendChild(moduleDiv); appMain.appendChild(container); 
+  activeCleanup = act.render(moduleDiv, currentLang); 
+}
+
+/* ============================================================
+   2. REGISTRE DES ACTIVITÉS
+   ============================================================ */
+const REGISTRY = {
+  // --- SPECTROPHOTOMÉTRIE ---
+  spectro: { domain: 'chimie', icon: '🌈', render: function(container, lang) {
+    const SOLS = {
+      permanganate: { name: "KMnO₄", color: "#7b1fa2", lambda: 530, kTrue: 2300, unit: "mmol/L", conc: [0, 0.2, 0.4, 0.6, 0.8, 1.0], unk: 0.55 },
+      cuivre: { name: "CuSO₄", color: "#1565c0", lambda: 800, kTrue: 12.5, unit: "mmol/L", conc: [0, 20, 40, 60, 80, 100], unk: 55 }
+    };
+    let currentSol = null, measured = {}, unkMeasured = null;
+    
+    function draw() {
+      const canvas = document.getElementById('spectro-canvas'); if(!canvas) return;
+      const sol = SOLS[currentSol]; const ctx = canvas.getContext('2d');
+      const W = canvas.width = 600, H = canvas.height = 300;
+      const padL = 60, padB = 40, padT = 20, padR = 20;
+      const plotW = W-padL-padR, plotH = H-padT-padB;
+      ctx.clearRect(0,0,W,H); ctx.fillStyle = '#fff'; ctx.fillRect(0,0,W,H);
+      
+      ctx.strokeStyle = '#eee'; ctx.lineWidth = 1;
+      for(let i=0; i<=5; i++) { ctx.beginPath(); ctx.moveTo(padL, padT+i*plotH/5); ctx.lineTo(W-padR, padT+i*plotH/5); ctx.stroke(); }
+      ctx.beginPath(); ctx.moveTo(padL, H-padB); ctx.lineTo(W-padR, H-padB); ctx.moveTo(padL, H-padB); ctx.lineTo(padL, padT); ctx.strokeStyle = '#333'; ctx.lineWidth = 2; ctx.stroke();
+      
+      ctx.fillStyle = '#444'; ctx.font = '12px Segoe UI'; ctx.textAlign = 'center';
+      ctx.fillText(`C (${sol.unit})`, W/2, H-10);
+      ctx.save(); ctx.translate(15, H/2); ctx.rotate(-Math.PI/2); ctx.fillText('Absorbance', 0, 0); ctx.restore();
+      
+      // Points (sauf le blanc C=0 pour le tracé visuel)
+      ctx.fillStyle = '#2c5364';
+      Object.keys(measured).forEach(k => {
+        const c = sol.conc[k]; const a = measured[k];
+        const x = padL + (c/sol.conc[sol.conc.length-1])*plotW;
+        const y = H - padB - (a/2.5)*plotH;
+        ctx.beginPath(); ctx.arc(x, y, 5, 0, 2*Math.PI); ctx.fill();
+      });
+      if (unkMeasured) {
+        const x = padL + (sol.unk/sol.conc[sol.conc.length-1])*plotW;
+        const y = H - padB - (unkMeasured/2.5)*plotH;
+        ctx.fillStyle = '#e65100'; ctx.beginPath(); ctx.arc(x, y, 7, 0, 2*Math.PI); ctx.fill();
+      }
+    }
+    
+    function update() {
+      const sol = SOLS[currentSol];
+      let table = `<table><tr><th>C (${sol.unit})</th><th>Absorbance</th></tr>`;
+      sol.conc.forEach((c, i) => { table += `<tr><td>${c}</td><td>${measured[i] !== undefined ? measured[i].toFixed(3) : '—'}</td></tr>`; });
+      table += `<tr style="background:#fff3e0;"><td>Inconnue</td><td>${unkMeasured ? unkMeasured.toFixed(3) : '—'}</td></tr></table>`;
+      document.getElementById('spec-table').innerHTML = table;
+      draw();
+    }
+    
+    function measure(idx) {
+      const sol = SOLS[currentSol];
+      // Si c'est le blanc (C=0), on met une absorbance quasi-nulle pour le réalisme
+      const trueA = idx === -1 ? (sol.kTrue * sol.unk) : (sol.kTrue * sol.conc[idx]);
+      const noise = idx === 0 ? 0 : (Math.random() - 0.5) * 0.02 * trueA; // Pas de bruit pour le blanc
+      const val = Math.max(0, trueA + noise);
+      if (idx === -1) unkMeasured = val; else measured[idx] = val;
+      update();
+    }
+    
+    container.innerHTML = `
+      <div class="info-box">Choisissez une solution, mesurez les étalons (dont le blanc), puis l'inconnue.</div>
+      <div class="choices">
+        <div class="card" onclick="window.LABOPC_ACTIVE.selectSol('permanganate')"><div class="title">KMnO₄ (530 nm)</div></div>
+        <div class="card" onclick="window.LABOPC_ACTIVE.selectSol('cuivre')"><div class="title">CuSO₄ (800 nm)</div></div>
+      </div>
+      <div id="spec-area"></div>
+    `;
+    
+    window.LABOPC_ACTIVE = {
+      selectSol: (key) => {
+        currentSol = key; measured = {}; unkMeasured = null;
+        const sol = SOLS[key];
+        let btns = sol.conc.map((c, i) => `<button class="btn secondary" onclick="window.LABOPC_ACTIVE.measure(${i})" style="font-size:0.8rem;">C=${c}</button>`).join('');
+        btns += `<button class="btn" style="border:2px dashed #e65100;background:#fff3e0;color:#e65100;" onclick="window.LABOPC_ACTIVE.measure(-1)">❓ Inconnue</button>`;
+        
+        document.getElementById('spec-area').innerHTML = `
+          <div class="sim-layout">
+            <div class="montage-frame">
+              <!-- Spectrophotomètre SVG -->
+              <svg width="300" height="200" viewBox="0 0 300 200">
+                <rect x="20" y="20" width="260" height="160" fill="#2c3e50" rx="10"/>
+                <rect x="40" y="50" width="80" height="40" fill="#0a1a12" rx="4"/>
+                <text x="80" y="75" fill="#6ee7b7" font-family="monospace" font-size="16" text-anchor="middle">A = ${unkMeasured ? unkMeasured.toFixed(3) : '0.000'}</text>
+                <!-- Fente pour cuve -->
+                <rect x="150" y="60" width="40" height="100" fill="#111" rx="4"/>
+                <rect x="155" y="80" width="30" height="60" fill="${sol.color}" opacity="0.8"/>
+                <line x1="40" y1="110" x2="150" y2="110" stroke="#ffeb3b" stroke-width="2" stroke-dasharray="5,5"/>
+                <circle cx="220" cy="150" r="15" fill="#546e7a"/>
+                <text x="220" y="155" fill="#fff" font-size="10" text-anchor="middle">λ</text>
+              </svg>
+            </div>
+            <div class="controls-panel">
+              <h3 style="margin-top:0;">Mesures :</h3><div style="display:flex;gap:8px;flex-wrap:wrap;margin-bottom:15px;">${btns}</div>
+              <div id="spec-table"></div>
+            </div>
+          </div>
+          <canvas id="spectro-canvas" width="600" height="300"></canvas>
+          <div id="spec-steps"></div>
+        `;
+        update();
+      },
+      measure: (idx) => {
+        measure(idx);
+        // Calcul de la régression : on ignore le point C=0 (le blanc) pour la pente
+        const sol = SOLS[currentSol];
+        let sumX=0, sumY=0, sumXY=0, sumX2=0, n=0;
+        sol.conc.forEach((c, i) => {
+          if (i > 0 && measured[i] !== undefined) { // i > 0 pour exclure le blanc
+            sumX+=c; sumY+=measured[i]; sumXY+=c*measured[i]; sumX2+=c*c; n++;
+          }
+        });
+        
+        if (unkMeasured && n >= 3) {
+          const a = (n*sumXY - sumX*sumY) / (n*sumX2 - sumX*sumX);
+          const b = (sumY - a*sumX) / n;
+          const C_unk = (unkMeasured - b) / a;
+          
+          document.getElementById('spec-steps').innerHTML = `
+            <div class="steps-container">
+              <h3>🧮 Démarche détaillée</h3>
+              <div class="step-item"><div class="step-number">1</div><div class="step-body"><div class="step-title">Loi de Beer-Lambert</div><div class="step-formula">A = k × C</div></div></div>
+              <div class="step-item"><div class="step-number">2</div><div class="step-body"><div class="step-title">Droite d'étalonnage (régression sur les points > 0)</div><div class="step-calc">A = ${a.toFixed(2)} × C + ${b.toFixed(3)}</div></div></div>
+              <div class="step-item"><div class="step-number">3</div><div class="step-body"><div class="step-title">Calcul de la concentration inconnue</div><div class="step-calc">C = (A - b) / a = (${unkMeasured.toFixed(3)} - ${b.toFixed(3)}) / ${a.toFixed(2)}</div><div class="result-box"><p class="big">C = ${C_unk.toFixed(2)} ${sol.unit}</p></div></div></div>
+            </div>
+          `;
+        }
+      }
+    };
+    return function cleanup() { delete window.LABOPC_ACTIVE; };
+  }},
+
+  // --- CONDUCTIMÉTRIE ---
+  conducto: { domain: 'chimie', icon: '⚡', render: function(container, lang) {
+    const SOLS = {
+      nacl: { name: "NaCl", k: 0.1264, unit: "mmol/L", conc: [0, 2, 4, 6, 8, 10], unk: 6.5 },
+      kcl: { name: "KCl", k: 0.1498, unit: "mmol/L", conc: [0, 2, 4, 6, 8, 10], unk: 7.2 },
+      cuso4: { name: "CuSO₄", k: 0.2672, unit: "mmol/L", conc: [0, 1, 2, 3, 4, 5], unk: 2.4 },
+      cacl2: { name: "CaCl₂", k: 0.2716, unit: "mmol/L", conc: [0, 1, 2, 3, 4, 5], unk: 3.1 }
+    };
+    let currentSol = null, measured = {}, unkMeasured = null;
+    
+    function draw() {
+      const canvas = document.getElementById('cond-canvas'); if(!canvas) return;
+      const sol = SOLS[currentSol]; const ctx = canvas.getContext('2d');
+      const W = canvas.width = 600, H = canvas.height = 300;
+      const padL = 60, padB = 40, padT = 20, padR = 20;
+      const plotW = W-padL-padR, plotH = H-padT-padB;
+      ctx.clearRect(0,0,W,H); ctx.fillStyle = '#fff'; ctx.fillRect(0,0,W,H);
+      
+      ctx.strokeStyle = '#eee'; ctx.lineWidth = 1;
+      for(let i=0; i<=5; i++) { ctx.beginPath(); ctx.moveTo(padL, padT+i*plotH/5); ctx.lineTo(W-padR, padT+i*plotH/5); ctx.stroke(); }
+      ctx.beginPath(); ctx.moveTo(padL, H-padB); ctx.lineTo(W-padR, H-padB); ctx.moveTo(padL, H-padB); ctx.lineTo(padL, padT); ctx.strokeStyle = '#333'; ctx.lineWidth = 2; ctx.stroke();
+      
+      ctx.fillStyle = '#444'; ctx.font = '12px Segoe UI'; ctx.textAlign = 'center'; ctx.fillText(`C (${sol.unit})`, W/2, H-10);
+      ctx.save(); ctx.translate(15, H/2); ctx.rotate(-Math.PI/2); ctx.fillText('σ (mS/cm)', 0, 0); ctx.restore();
+      
+      ctx.fillStyle = '#2c5364';
+      Object.keys(measured).forEach(k => {
+        const c = sol.conc[k]; const s = measured[k];
+        const x = padL + (c/sol.conc[sol.conc.length-1])*plotW;
+        const y = H - padB - (s/3.0)*plotH;
+        ctx.beginPath(); ctx.arc(x, y, 5, 0, 2*Math.PI); ctx.fill();
+      });
+      if (unkMeasured) {
+        const x = padL + (sol.unk/sol.conc[sol.conc.length-1])*plotW;
+        const y = H - padB - (unkMeasured/3.0)*plotH;
+        ctx.fillStyle = '#e65100'; ctx.beginPath(); ctx.arc(x, y, 7, 0, 2*Math.PI); ctx.fill();
+      }
+    }
+    
+    function update() {
+      const sol = SOLS[currentSol];
+      let table = `<table><tr><th>C (${sol.unit})</th><th>σ (mS/cm)</th></tr>`;
+      sol.conc.forEach((c, i) => { table += `<tr><td>${c}</td><td>${measured[i] !== undefined ? measured[i].toFixed(3) : '—'}</td></tr>`; });
+      table += `<tr style="background:#fff3e0;"><td>Inconnue</td><td>${unkMeasured ? unkMeasured.toFixed(3) : '—'}</td></tr></table>`;
+      document.getElementById('cond-table').innerHTML = table; draw();
+    }
+    
+    function measure(idx) {
+      const sol = SOLS[currentSol];
+      const trueS = idx === -1 ? (sol.k * sol.unk) : (sol.k * sol.conc[idx]);
+      const noise = idx === 0 ? 0 : (Math.random() - 0.5) * 0.02 * trueS;
+      const val = Math.max(0, trueS + noise);
+      if (idx === -1) unkMeasured = val; else measured[idx] = val;
+      update();
+    }
+    
+    container.innerHTML = `
+      <div class="info-box">Choisissez une solution, mesurez les étalons, puis l'inconnue.</div>
+      <div class="choices">
+        <div class="card" onclick="window.LABOPC_ACTIVE.selectSol('nacl')"><div class="title">NaCl</div></div>
+        <div class="card" onclick="window.LABOPC_ACTIVE.selectSol('kcl')"><div class="title">KCl</div></div>
+        <div class="card" onclick="window.LABOPC_ACTIVE.selectSol('cuso4')"><div class="title">CuSO₄</div></div>
+        <div class="card" onclick="window.LABOPC_ACTIVE.selectSol('cacl2')"><div class="title">CaCl₂</div></div>
+      </div>
+      <div id="cond-area"></div>
+    `;
+    
+    window.LABOPC_ACTIVE = {
+      selectSol: (key) => {
+        currentSol = key; measured = {}; unkMeasured = null;
+        const sol = SOLS[key];
+        let btns = sol.conc.map((c, i) => `<button class="btn secondary" onclick="window.LABOPC_ACTIVE.measure(${i})" style="font-size:0.8rem;">C=${c}</button>`).join('');
+        btns += `<button class="btn" style="border:2px dashed #e65100;background:#fff3e0;color:#e65100;" onclick="window.LABOPC_ACTIVE.measure(-1)">❓ Inconnue</button>`;
+        
+        document.getElementById('cond-area').innerHTML = `
+          <div class="sim-layout">
+            <div class="montage-frame">
+              <!-- Conductimètre SVG -->
+              <svg width="300" height="200" viewBox="0 0 300 200">
+                <rect x="20" y="20" width="260" height="160" fill="#2c3e50" rx="10"/>
+                <rect x="40" y="50" width="80" height="40" fill="#0a0a1a" rx="4"/>
+                <text x="80" y="75" fill="#64b5f6" font-family="monospace" font-size="16" text-anchor="middle">σ = ${unkMeasured ? unkMeasured.toFixed(3) : '0.000'}</text>
+                <!-- Cellule -->
+                <rect x="160" y="40" width="80" height="100" fill="#f0f4f8" stroke="#7a8fa3" stroke-width="2" rx="4"/>
+                <rect x="165" y="80" width="70" height="55" fill="#b3e5fc" opacity="0.8"/>
+                <rect x="180" y="40" width="8" height="80" fill="#546e7a"/>
+                <rect x="210" y="40" width="8" height="80" fill="#546e7a"/>
+              </svg>
+            </div>
+            <div class="controls-panel">
+              <h3 style="margin-top:0;">Mesures :</h3><div style="display:flex;gap:8px;flex-wrap:wrap;margin-bottom:15px;">${btns}</div>
+              <div id="cond-table"></div>
+            </div>
+          </div>
+          <canvas id="cond-canvas" width="600" height="300"></canvas>
+          <div id="cond-steps"></div>
+        `;
+        update();
+      },
+      measure: (idx) => {
+        measure(idx);
+        const sol = SOLS[currentSol];
+        let sumX=0, sumY=0, sumXY=0, sumX2=0, n=0;
+        sol.conc.forEach((c, i) => {
+          if (i > 0 && measured[i] !== undefined) {
+            sumX+=c; sumY+=measured[i]; sumXY+=c*measured[i]; sumX2+=c*c; n++;
+          }
+        });
+        if (unkMeasured && n >= 3) {
+          const a = (n*sumXY - sumX*sumY) / (n*sumX2 - sumX*sumX);
+          const b = (sumY - a*sumX) / n;
+          const C_unk = (unkMeasured - b) / a;
+          
+          document.getElementById('cond-steps').innerHTML = `
+            <div class="steps-container">
+              <h3>🧮 Démarche détaillée</h3>
+              <div class="step-item"><div class="step-number">1</div><div class="step-body"><div class="step-title">Loi de Kohlrausch</div><div class="step-formula">σ = k × C</div></div></div>
+              <div class="step-item"><div class="step-number">2</div><div class="step-body"><div class="step-title">Droite d'étalonnage (régression)</div><div class="step-calc">σ = ${a.toFixed(2)} × C + ${b.toFixed(3)}</div></div></div>
+              <div class="step-item"><div class="step-number">3</div><div class="step-body"><div class="step-title">Calcul de la concentration inconnue</div><div class="step-calc">C = (σ - b) / a = (${unkMeasured.toFixed(3)} - ${b.toFixed(3)}) / ${a.toFixed(2)}</div><div class="result-box"><p class="big">C = ${C_unk.toFixed(2)} ${sol.unit}</p></div></div></div>
+            </div>
+          `;
+        }
+      }
+    };
+    return function cleanup() { delete window.LABOPC_ACTIVE; };
+  }},
+
+  // --- TITRAGE ---
+  titrage: { domain: 'chimie', icon: '💧', render: function(container, lang) {
+    let sys = null, vol = 0, eqVol = 0, running = false, animId = null;
+    const SYSTEMS = {
+      hcl: { name: "HCl / NaOH", Ca: 0.1, Cb: 0.1, Va: 10, type: 'fort' },
+      acide: { name: "CH₃COOH / NaOH", Ca: 0.1, Cb: 0.1, Va: 10, type: 'faible', pKa: 4.76 }
+    };
+    function calcPH(v) {
+      const Va = sys.Va / 1000, Vb = v / 1000, Vtot = Va + Vb;
+      const nA = sys.Ca * Va, nB = sys.Cb * Vb;
+      if (sys.type === 'fort') {
+        if (nB < nA) return -Math.log10((nA - nB) / Vtot);
+        if (nB > nA) return 14 + Math.log10((nB - nA) / Vtot);
+        return 7;
+      } else {
+        if (v < eqVol) { const ratio = nB / Math.max(1e-10, nA - nB); return sys.pKa + Math.log10(ratio); }
+        if (v > eqVol) return 14 + Math.log10((nB - nA) / Vtot);
+        return 7;
+      }
+    }
+    function draw() {
+      const canvas = document.getElementById('tit-canvas'); if(!canvas) return;
+      const ctx = canvas.getContext('2d');
+      const W = canvas.width = 600, H = canvas.height = 300;
+      const padL = 60, padB = 40, padT = 20, padR = 20;
+      const plotW = W-padL-padR, plotH = H-padT-padB;
+      ctx.clearRect(0,0,W,H); ctx.fillStyle = '#fff'; ctx.fillRect(0,0,W,H);
+      
+      ctx.beginPath(); ctx.moveTo(padL, H-padB); ctx.lineTo(W-padR, H-padB); ctx.moveTo(padL, H-padB); ctx.lineTo(padL, padT); ctx.strokeStyle = '#333'; ctx.lineWidth = 2; ctx.stroke();
+      ctx.fillStyle = '#444'; ctx.font = '12px Segoe UI'; ctx.textAlign = 'center'; ctx.fillText('V (mL)', W/2, H-10);
+      ctx.save(); ctx.translate(15, H/2); ctx.rotate(-Math.PI/2); ctx.fillText('pH', 0, 0); ctx.restore();
+      
+      ctx.beginPath();
+      for (let v = 0; v <= vol; v += 0.1) {
+        const pH = calcPH(v);
+        const x = padL + (v / (eqVol * 2.2)) * plotW;
+        const y = H - padB - (pH / 14) * plotH;
+        if (v === 0) ctx.moveTo(x, y); else ctx.lineTo(x, y);
+      }
+      ctx.strokeStyle = '#e63946'; ctx.lineWidth = 2.5; ctx.stroke();
+      
+      if (sys) {
+        const xEq = padL + (eqVol / (eqVol * 2.2)) * plotW;
+        ctx.setLineDash([5,5]); ctx.beginPath(); ctx.moveTo(xEq, padT); ctx.lineTo(xEq, H-padB); ctx.strokeStyle = '#11998e'; ctx.lineWidth = 1.5; ctx.stroke(); ctx.setLineDash([]);
+      }
+    }
+    function update() {
+      document.getElementById('tit-vol').textContent = vol.toFixed(1) + ' mL';
+      document.getElementById('tit-ph').textContent = sys ? calcPH(vol).toFixed(2) : '—';
+      draw();
+    }
+    function loop() {
+      if (!running) return;
+      vol += 0.1;
+      if (vol >= eqVol * 2.2) { vol = eqVol * 2.2; running = false; document.getElementById('tit-btn').textContent = 'Terminé'; showSteps(); }
+      update();
+      if (running) animId = requestAnimationFrame(loop);
+    }
+    function showSteps() {
+      if (!sys) return;
+      document.getElementById('tit-steps').innerHTML = `
+        <div class="steps-container">
+          <h3>🧮 Démarche détaillée</h3>
+          <div class="step-item"><div class="step-number">1</div><div class="step-body"><div class="step-title">Équation de la réaction</div><div class="step-formula">H₃O⁺ + HO⁻ → 2 H₂O</div></div></div>
+          <div class="step-item"><div class="step-number">2</div><div class="step-body"><div class="step-title">Relation à l'équivalence</div><div class="step-formula">n(H₃O⁺) = n(HO⁻)</div></div></div>
+          <div class="step-item"><div class="step-number">3</div><div class="step-body"><div class="step-title">Calcul de la concentration inconnue</div><div class="step-formula">C_inconnue × V_inconnue = C_titrant × V_E</div><div class="step-calc">C_inconnue = (${sys.Cb} × ${eqVol.toFixed(1)}) / ${sys.Va}</div><div class="result-box"><p class="big">C_inconnue = ${((sys.Cb * eqVol) / sys.Va).toFixed(3)} mol/L</p></div></div></div>
+        </div>
+      `;
+    }
+    
+    container.innerHTML = `
+      <div class="info-box">Choisissez un système à titrer.</div>
+      <div class="choices">
+        <div class="card" onclick="window.LABOPC_ACTIVE.start('hcl')"><div class="title">HCl / NaOH</div></div>
+        <div class="card" onclick="window.LABOPC_ACTIVE.start('acide')"><div class="title">CH₃COOH / NaOH</div></div>
+      </div>
+      <div id="tit-area"></div>
+    `;
+    
+    window.LABOPC_ACTIVE = {
+      start: (key) => {
+        sys = SYSTEMS[key]; eqVol = (sys.Ca * sys.Va) / sys.Cb; vol = 0; running = false;
+        document.getElementById('tit-area').innerHTML = `
+          <div class="sim-layout">
+            <div class="montage-frame">
+              <!-- Montage Titrage SVG -->
+              <svg width="200" height="300" viewBox="0 0 200 300">
+                <rect x="20" y="270" width="120" height="15" fill="#b0bec5" rx="3"/>
+                <rect x="60" y="20" width="10" height="250" fill="#90a4ae"/>
+                <rect x="85" y="40" width="20" height="180" fill="#eaf4fa" stroke="#7a8fa3" stroke-width="2"/>
+                <rect x="87" y="100" width="16" height="118" fill="#11998e" opacity="0.6"/>
+                <rect x="80" y="220" width="30" height="15" fill="#546e7a" rx="2"/>
+                <path d="M 60 240 L 60 290 Q 60 295 65 295 L 125 295 Q 130 295 130 290 L 130 240" fill="#f0f4f8" stroke="#7a8fa3" stroke-width="2"/>
+                <rect x="62" y="260" width="66" height="33" fill="#e0f2f1" opacity="0.8"/>
+              </svg>
+            </div>
+            <div class="controls-panel">
+              <div class="live-readout"><div class="lbl">VOLUME</div><div id="tit-vol">0.0 mL</div></div>
+              <div class="live-readout"><div class="lbl">pH</div><div id="tit-ph">—</div></div>
+              <button class="btn success" id="tit-btn" onclick="window.LABOPC_ACTIVE.toggle()">▶ Lancer</button>
+            </div>
+          </div>
+          <canvas id="tit-canvas" width="600" height="300"></canvas>
+          <div id="tit-steps"></div>
+        `;
+        update();
+      },
+      toggle: () => {
+        running = !running;
+        document.getElementById('tit-btn').textContent = running ? '⏸ Pause' : '▶ Reprendre';
+        if (running) loop();
+        else if (animId) cancelAnimationFrame(animId);
+      }
+    };
+    return function cleanup() { running = false; if (animId) cancelAnimationFrame(animId); delete window.LABOPC_ACTIVE; };
+  }},
+
+  // --- DISSOLUTION ---
+  dissolution: { domain: 'chimie', icon: '⚖️', render: function(container, lang) {
+    container.innerHTML = `
+      <div class="info-box">Préparer 100 mL de solution de sulfate de cuivre à 0,1 mol/L.</div>
+      <div class="choices">
+        <div class="card" onclick="window.LABOPC_ACTIVE.calc(159.6, 'Anhydre')"><div class="title">CuSO₄ (Anhydre)</div><div class="desc">M = 159,6 g/mol</div></div>
+        <div class="card" onclick="window.LABOPC_ACTIVE.calc(249.7, 'Pentahydraté')"><div class="title">CuSO₄·5H₂O</div><div class="desc">M = 249,7 g/mol</div></div>
+      </div>
+      <div id="diss-res" style="margin-top:20px;"></div>
+    `;
+    window.LABOPC_ACTIVE = {
+      calc: (M, type) => {
+        const m = 0.1 * 0.100 * M;
+        document.getElementById('diss-res').innerHTML = `
+          <div class="sim-layout">
+            <div class="montage-frame">
+              <svg width="150" height="200" viewBox="0 0 150 200">
+                <rect x="25" y="160" width="100" height="20" fill="#546e7a" rx="4"/>
+                <rect x="70" y="140" width="10" height="20" fill="#90a4ae"/>
+                <ellipse cx="75" cy="140" rx="40" ry="8" fill="#b0bec5"/>
+                <path d="M 60 50 L 60 120 Q 60 140 75 140 Q 90 140 90 120 L 90 50" fill="#eaf4fa" stroke="#7a8fa3" stroke-width="2"/>
+                <line x1="60" y1="60" x2="90" y2="60" stroke="#333" stroke-width="1"/>
+                <rect x="62" y="90" width="26" height="48" fill="#1565c0" opacity="0.6"/>
+              </svg>
+            </div>
+            <div class="controls-panel">
+              <div class="steps-container">
+                <h3>🧮 Démarche détaillée</h3>
+                <div class="step-item"><div class="step-number">1</div><div class="step-body"><div class="step-title">Calcul de la quantité de matière</div><div class="step-formula">n = C × V</div><div class="step-calc">n = 0,1 × 0,100 = 0,010 mol</div></div></div>
+                <div class="step-item"><div class="step-number">2</div><div class="step-body"><div class="step-title">Calcul de la masse à peser</div><div class="step-formula">m = n × M</div><div class="step-calc">m = 0,010 × ${M} = ${m.toFixed(2)} g</div><div class="result-box"><p class="big">Masse = ${m.toFixed(2)} g (${type})</p></div></div></div>
+              </div>
+            </div>
+          </div>
+        `;
+      }
+    };
+    return function cleanup() { delete window.LABOPC_ACTIVE; };
+  }},
+
+  // --- BOYLE ---
+  boyle: { domain: 'chimie', icon: '💨', render: function(container, lang) {
+    container.innerHTML = `
+      <div class="info-box">Loi de Boyle-Mariotte : P × V = constante (à T constante).</div>
+      <div class="sim-layout">
+        <div class="montage-frame">
+          <svg width="150" height="200" viewBox="0 0 150 200">
+            <rect x="50" y="20" width="50" height="160" fill="#f0f4f8" stroke="#7a8fa3" stroke-width="2"/>
+            <rect id="boyle-piston-svg" x="52" y="60" width="46" height="10" fill="#546e7a"/>
+            <rect x="70" y="0" width="10" height="60" fill="#90a4ae"/>
+            <rect x="52" y="100" width="46" height="78" fill="#e0f7fa" opacity="0.5"/>
+          </svg>
+        </div>
+        <div class="controls-panel">
+          <div class="live-readout"><div class="lbl">PRESSION P (hPa)</div><div id="boyle-p">1013</div></div>
+          <div class="live-readout" style="margin-top:8px;"><div class="lbl">VOLUME V (mL)</div><div id="boyle-v">20.0</div></div>
+          <div class="input-group"><label>Volume (mL) :</label> <input type="range" id="boyle-slider" min="10" max="40" value="20" step="1" oninput="window.LABOPC_ACTIVE.calc(this.value)" style="width:100%;"></div>
+        </div>
+      </div>
+      <div id="boyle-steps"></div>
+    `;
+    window.LABOPC_ACTIVE = {
+      calc: (val) => {
+        const V = parseFloat(val); const P = (1013 * 20) / V;
+        document.getElementById('boyle-v').textContent = V.toFixed(1);
+        document.getElementById('boyle-p').textContent = P.toFixed(0);
+        const pistonY = 160 - (V - 10) * 4;
+        document.getElementById('boyle-piston-svg').setAttribute('y', pistonY);
+
+        document.getElementById('boyle-steps').innerHTML = `
+          <div class="steps-container">
+            <h3>🧮 Démarche</h3>
+            <div class="step-item"><div class="step-number">1</div><div class="step-body"><div class="step-title">Loi de Boyle-Mariotte</div><div class="step-formula">P₁ × V₁ = P₂ × V₂</div></div></div>
+            <div class="step-item"><div class="step-number">2</div><div class="step-body"><div class="step-title">Calcul de la pression pour le nouveau volume</div><div class="step-calc">P₂ = (P₁ × V₁) / V₂ = (1013 × 20) / ${V}</div><div class="result-box"><p class="big">P = ${P.toFixed(0)} hPa | P × V = ${(P*V).toFixed(0)}</p></div></div></div>
+          </div>
+        `;
+      }
+    };
+    window.LABOPC_ACTIVE.calc(20);
+    return function cleanup() { delete window.LABOPC_ACTIVE; };
+  }},
+
+  // --- CHUTE LIBRE ---
+  chute: { domain: 'physique', icon: '🪂', render: function(container, lang) {
+    container.innerHTML = `
+      <div class="info-box">Chute libre avec frottements.</div>
+      <div class="sim-layout">
+        <div class="montage-frame"><canvas id="chute-canvas" width="300" height="400"></canvas></div>
+        <div class="controls-panel">
+          <div class="live-readout"><div class="lbl">VITESSE (m/s)</div><div id="chute-v">0.00</div></div>
+          <button class="btn success" id="chute-btn" onclick="window.LABOPC_ACTIVE.toggle()">▶ Lancer</button>
+        </div>
+      </div>
+    `;
+    let y = 20, v = 0, running = false, animId = null, lastTime = 0;
+    function draw() {
+      const canvas = document.getElementById('chute-canvas'); if (!canvas) return;
+      const ctx = canvas.getContext('2d'); ctx.clearRect(0,0,300,400);
+      ctx.fillStyle = '#eaf4fa'; ctx.fillRect(0,0,300,400);
+      ctx.fillStyle = '#546e7a'; ctx.beginPath(); ctx.arc(150, y, 15, 0, 2*Math.PI); ctx.fill();
+    }
+    function loop(time) {
+      if (!running) return;
+      if (!lastTime) lastTime = time;
+      const dt = (time - lastTime) / 1000; lastTime = time;
+      v += (9.81 - 0.5 * v) * dt; 
+      y += v * dt * 20; 
+      if (y > 380) { y = 20; v = 0; } 
+      document.getElementById('chute-v').textContent = v.toFixed(2);
+      draw(); animId = requestAnimationFrame(loop);
+    }
+    window.LABOPC_ACTIVE = {
+      toggle: () => {
+        running = !running; lastTime = 0;
+        document.getElementById('chute-btn').textContent = running ? '⏸ Arrêter' : '▶ Lancer';
+        if (running) animId = requestAnimationFrame(loop);
+        else if (animId) cancelAnimationFrame(animId);
+      }
+    };
+    draw();
+    return function cleanup() { running = false; if (animId) cancelAnimationFrame(animId); delete window.LABOPC_ACTIVE; };
+  }},
+
+  // --- DIFFRACTION ---
+  diffraction: { domain: 'physique', icon: '💡', render: function(container, lang) {
+    container.innerHTML = `
+      <div class="info-box">Diffraction par une fente.</div>
+      <canvas id="diff-canvas" width="600" height="200"></canvas>
+      <div class="input-group"><label>Fente a (µm) :</label> <input type="range" id="diff-a" min="10" max="100" value="50" step="1" oninput="window.LABOPC_ACTIVE.calc()"></div>
+      <div class="input-group"><label>Longueur d'onde λ (nm) :</label> <input type="range" id="diff-l" min="400" max="700" value="600" step="10" oninput="window.LABOPC_ACTIVE.calc()"></div>
+      <div id="diff-steps"></div>
+    `;
+    window.LABOPC_ACTIVE = {
+      calc: () => {
+        const a = parseFloat(document.getElementById('diff-a').value) * 1e-6;
+        const l = parseFloat(document.getElementById('diff-l').value) * 1e-9;
+        const L = (2 * l * 2) / a * 1e3; 
+        const canvas = document.getElementById('diff-canvas'); if (!canvas) return;
+        const ctx = canvas.getContext('2d'); const w = canvas.width, h = canvas.height;
+        ctx.fillStyle = '#000'; ctx.fillRect(0,0,w,h);
+        ctx.fillStyle = '#fff'; const cx = w/2; const width = Math.max(10, 30000 * l / a);
+        const grad = ctx.createLinearGradient(cx - width, 0, cx + width, 0);
+        grad.addColorStop(0, 'rgba(255,255,255,0)'); grad.addColorStop(0.5, 'rgba(255,255,255,1)'); grad.addColorStop(1, 'rgba(255,255,255,0)');
+        ctx.fillStyle = grad; ctx.fillRect(cx - width, 50, width*2, 100);
+        
+        document.getElementById('diff-steps').innerHTML = `
+          <div class="steps-container">
+            <h3>🧮 Démarche</h3>
+            <div class="step-item"><div class="step-number">1</div><div class="step-body"><div class="step-title">Écart angulaire</div><div class="step-formula">θ = λ / a</div></div></div>
+            <div class="step-item"><div class="step-number">2</div><div class="step-body"><div class="step-title">Largeur de la tache centrale sur un écran à D = 2 m</div><div class="step-formula">L = 2 × λ × D / a</div><div class="step-calc">L = 2 × ${l*1e9}×10⁻⁹ × 2 / ${a*1e6}×10⁻⁶</div><div class="result-box"><p class="big">L ≈ ${L.toFixed(1)} mm</p></div></div></div>
+          </div>
+        `;
+      }
+    };
+    window.LABOPC_ACTIVE.calc();
+    return function cleanup() { delete window.LABOPC_ACTIVE; };
+  }},
+
+  // --- LENTILLE ---
+  lentille: { domain: 'physique', icon: '🔎', render: function(container, lang) {
+    container.innerHTML = `
+      <div class="info-box">Lentille mince convergente (f' = 10 cm).</div>
+      <canvas id="lentille-canvas" width="600" height="250"></canvas>
+      <div class="input-group"><label>Distance objet OA (cm) :</label> <input type="range" id="lentille-oa" min="5" max="40" value="15" step="1" oninput="window.LABOPC_ACTIVE.calc(this.value)"></div>
+      <div id="lentille-steps"></div>
+    `;
+    window.LABOPC_ACTIVE = {
+      calc: (val) => {
+        const f = 10, OA = -val, OA_prime = (f * OA) / (OA + f);
+        const canvas = document.getElementById('lentille-canvas'); if (!canvas) return;
+        const ctx = canvas.getContext('2d'); const w = canvas.width, h = canvas.height, cx = w/2, cy = h/2, scale = 5;
+        ctx.clearRect(0,0,w,h);
+        ctx.beginPath(); ctx.moveTo(0, cy); ctx.lineTo(w, cy); ctx.strokeStyle = '#ccc'; ctx.stroke();
+        ctx.beginPath(); ctx.ellipse(cx, cy, 10, 60, 0, 0, 2*Math.PI); ctx.strokeStyle = '#2c5364'; ctx.lineWidth = 3; ctx.stroke();
+        ctx.fillStyle = '#e74c3c'; ctx.beginPath(); ctx.arc(cx - f*scale, cy, 4, 0, 2*Math.PI); ctx.fill(); ctx.beginPath(); ctx.arc(cx + f*scale, cy, 4, 0, 2*Math.PI); ctx.fill();
+        const objX = cx + OA*scale; ctx.beginPath(); ctx.moveTo(objX, cy); ctx.lineTo(objX, cy - 40); ctx.strokeStyle = '#3498db'; ctx.lineWidth = 3; ctx.stroke();
+        const imgX = cx + OA_prime*scale; ctx.beginPath(); ctx.moveTo(imgX, cy); ctx.lineTo(imgX, cy + 40); ctx.strokeStyle = '#6ee7b7'; ctx.lineWidth = 3; ctx.stroke();
+        
+        document.getElementById('lentille-steps').innerHTML = `
+          <div class="steps-container">
+            <h3>🧮 Démarche</h3>
+            <div class="step-item"><div class="step-number">1</div><div class="step-body"><div class="step-title">Relation de conjugaison</div><div class="step-formula">1/OA' - 1/OA = 1/f'</div></div></div>
+            <div class="step-item"><div class="step-number">2</div><div class="step-body"><div class="step-title">Calcul de la position de l'image</div><div class="step-calc">1/OA' = 1/10 + 1/(-${val})</div><div class="result-box"><p class="big">OA' = ${OA_prime.toFixed(1)} cm</p></div></div></div>
+          </div>
+        `;
+      }
+    };
+    window.LABOPC_ACTIVE.calc(15);
+    return function cleanup() { delete window.LABOPC_ACTIVE; };
+  }},
+
+  // --- VENTURI ---
+  venturi: { domain: 'physique', icon: '🌪️', render: function(container, lang) {
+    container.innerHTML = `<div class="info-box">Effet Venturi. La pression diminue dans le rétrécissement.</div><canvas id="vent-canvas" width="600" height="150"></canvas><div id="vent-steps"></div>`;
+    const ctx = document.getElementById('vent-canvas').getContext('2d');
+    ctx.fillStyle = '#b3e5fc'; ctx.beginPath(); ctx.moveTo(0, 20); ctx.lineTo(250, 20); ctx.lineTo(300, 60); ctx.lineTo(350, 20); ctx.lineTo(600, 20); ctx.lineTo(600, 130); ctx.lineTo(350, 130); ctx.lineTo(300, 90); ctx.lineTo(250, 130); ctx.lineTo(0, 130); ctx.fill();
+    document.getElementById('vent-steps').innerHTML = `<div class="steps-container"><h3>🧮 Démarche</h3><div class="step-item"><div class="step-number">1</div><div class="step-body"><div class="step-title">Relation de Bernoulli</div><div class="step-formula">P₁ + ½ρv₁² = P₂ + ½ρv₂²</div></div></div><div class="step-item"><div class="step-number">2</div><div class="step-body"><div class="step-title">Continuité du débit</div><div class="step-formula">S₁v₁ = S₂v₂</div><div class="step-calc">Si S₂ = S₁/3, alors v₂ = 3v₁</div><div class="result-box"><p class="big">P₂ < P₁</p></div></div></div></div>`;
+    return function cleanup() {};
+  }},
+
+  // --- ARCHIMÈDE ---
+  archimede: { domain: 'physique', icon: '🛟', render: function(container, lang) {
+    container.innerHTML = `<div class="info-box">Poussée d'Archimède.</div><div class="input-group"><label>Volume (L) :</label> <input type="number" id="arch-v" value="10" step="1"></div><div class="input-group"><label>Masse (kg) :</label> <input type="number" id="arch-m" value="5" step="0.5"></div><button class="btn success" onclick="window.LABOPC_ACTIVE.calc()">Calculer</button><div id="arch-res"></div>`;
+    window.LABOPC_ACTIVE = { calc: () => {
+      const V = parseFloat(document.getElementById('arch-v').value)/1000, m = parseFloat(document.getElementById('arch-m').value);
+      const P = m * 9.81, Pa = 1000 * V * 9.81;
+      document.getElementById('arch-res').innerHTML = `<div class="steps-container"><h3>🧮 Démarche</h3><div class="step-item"><div class="step-number">1</div><div class="step-body"><div class="step-title">Poids</div><div class="step-formula">P = m × g</div><div class="step-calc">P = ${m} × 9.81 = ${P.toFixed(1)} N</div></div></div><div class="step-item"><div class="step-number">2</div><div class="step-body"><div class="step-title">Poussée d'Archimède</div><div class="step-formula">Pa = ρ × V × g</div><div class="step-calc">Pa = 1000 × ${V} × 9.81 = ${Pa.toFixed(1)} N</div><div class="result-box"><p class="big">${P > Pa ? 'Coule' : 'Flotte'}</p></div></div></div></div>`;
+    }};
+    return function cleanup() { delete window.LABOPC_ACTIVE; };
+  }},
+
+  // --- INTERFÉRENCES ---
+  interferences: { domain: 'physique', icon: '🎛️', render: function(container, lang) {
+    container.innerHTML = `<div class="info-box">Interférences (fentes de Young).</div><canvas id="interf-canvas" width="600" height="200"></canvas><div id="interf-steps"></div>`;
+    const ctx = document.getElementById('interf-canvas').getContext('2d');
+    ctx.fillStyle = '#111'; ctx.fillRect(0,0,600,200); ctx.fillStyle = '#6ee7b7';
+    for(let x = 0; x < 600; x += 40) { ctx.fillRect(x, 50, 20, 100); }
+    document.getElementById('interf-steps').innerHTML = `<div class="steps-container"><h3>🧮 Démarche</h3><div class="step-item"><div class="step-number">1</div><div class="step-body"><div class="step-title">Interfrange</div><div class="step-formula">i = λ × D / b</div></div></div><div class="step-item"><div class="step-number">2</div><div class="step-body"><div class="step-title">Application numérique</div><div class="step-calc">i = 600×10⁻⁹ × 1,0 / 0,5×10⁻³</div><div class="result-box"><p class="big">i = 1,2 mm</p></div></div></div></div>`;
+    return function cleanup() {};
+  }},
+
+  // --- DOPPLER ---
+  doppler: { domain: 'physique', icon: '🚑', render: function(container, lang) {
+    container.innerHTML = `<div class="info-box">Effet Doppler. Vitesse > 0 (éloignement), Vitesse < 0 (approche).</div><canvas id="dop-canvas" width="600" height="200"></canvas><div id="dop-steps"></div>`;
+    const ctx = document.getElementById('dop-canvas').getContext('2d');
+    ctx.fillStyle = '#f0f4f8'; ctx.fillRect(0,0,600,200); ctx.fillStyle = '#e74c3c'; ctx.beginPath(); ctx.arc(300, 100, 20, 0, 2*Math.PI); ctx.fill();
+    document.getElementById('dop-steps').innerHTML = `<div class="steps-container"><h3>🧮 Démarche</h3><div class="step-item"><div class="step-number">1</div><div class="step-body"><div class="step-title">Décalage Doppler</div><div class="step-formula">f_app = f_ém × (c / (c + v))</div></div></div><div class="step-item"><div class="step-number">2</div><div class="step-body"><div class="step-title">Application</div><div class="step-calc">Si v = 10 m/s (éloignement) : f_app = 440 × (340 / 350) ≈ 427 Hz</div><div class="result-box"><p class="big">Fréquence perçue plus basse</p></div></div></div></div>`;
+    return function cleanup() {};
+  }}
+};
+
+// INITIALISATION
+renderLevels();
 </script>
 </body>
 </html>
