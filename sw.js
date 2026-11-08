@@ -1,29 +1,73 @@
-const CACHE_VERSION = 'labopc-v4.0.0';
+/* LABOPC service worker — update CACHE_VERSION whenever a deployed asset changes. */
+const CACHE_VERSION = 'labopc-v2.3.1';
 const CACHE_STATIC = `${CACHE_VERSION}-static`;
 const CACHE_RUNTIME = `${CACHE_VERSION}-runtime`;
 const PRECACHE_URLS = [
-  './', './index.html', './manifest.json', './version.json',
-  './icons/icon-192.png', './icons/icon-512.png', './icons/apple-touch-icon.png',
+  './',
+  './index.html',
+  './manifest.json',
+  './version.json',
+  './icon/icon-192.png',
+  './icon/icon-512.png',
+  './icon/apple-touch-icon.png',
+  './js/app-core.js',
+  './js/mod-chimie.js',
+  './js/mod-physique.js'
 ];
-self.addEventListener('install', (event) => {
-  event.waitUntil(caches.open(CACHE_STATIC).then(cache => cache.addAll(PRECACHE_URLS).catch(() => {})).then(() => self.skipWaiting()));
+
+self.addEventListener('install', event => {
+  event.waitUntil(
+    caches.open(CACHE_STATIC)
+      .then(cache => cache.addAll(PRECACHE_URLS))
+      .then(() => self.skipWaiting())
+  );
 });
-self.addEventListener('activate', (event) => {
-  event.waitUntil(caches.keys().then(keys => Promise.all(keys.filter(k => k !== CACHE_STATIC && k !== CACHE_RUNTIME).map(k => caches.delete(k)))).then(() => self.clients.claim()));
+
+self.addEventListener('activate', event => {
+  event.waitUntil(
+    caches.keys()
+      .then(keys => Promise.all(
+        keys.filter(key => key.startsWith('labopc-') && key !== CACHE_STATIC && key !== CACHE_RUNTIME)
+          .map(key => caches.delete(key))
+      ))
+      .then(() => self.clients.claim())
+  );
 });
-self.addEventListener('fetch', (event) => {
-  const req = event.request;
-  if (req.method !== 'GET') return;
-  const url = new URL(req.url);
+
+self.addEventListener('fetch', event => {
+  const request = event.request;
+  if (request.method !== 'GET') return;
+
+  const url = new URL(request.url);
   if (url.origin !== self.location.origin) return;
-  if (url.pathname.endsWith('/version.json')) { event.respondWith(fetch(req).catch(() => caches.match(req))); return; }
-  if (req.mode === 'navigate') {
-    event.respondWith(fetch(req).then(res => { const copy = res.clone(); caches.open(CACHE_RUNTIME).then(c => c.put(req, copy)); return res; }).catch(() => caches.match(req).then(r => r || caches.match('./index.html'))));
+
+  // Navigation: network first, cached application shell when offline.
+  if (request.mode === 'navigate') {
+    event.respondWith(
+      fetch(request)
+        .then(response => {
+          if (response && response.ok) {
+            const copy = response.clone();
+            caches.open(CACHE_RUNTIME).then(cache => cache.put(request, copy));
+          }
+          return response;
+        })
+        .catch(() => caches.match(request).then(cached => cached || caches.match('./index.html')))
+    );
     return;
   }
-  event.respondWith(caches.match(req).then(cached => {
-    if (cached) { fetch(req).then(res => { if (res && res.status === 200) caches.open(CACHE_RUNTIME).then(c => c.put(req, res)); }).catch(() => {}); return cached; }
-    return fetch(req).then(res => { if (res && res.status === 200 && res.type === 'basic') { const copy = res.clone(); caches.open(CACHE_RUNTIME).then(c => c.put(req, copy)); } return res; }).catch(() => caches.match('./index.html'));
-  }));
+
+  // Static assets: cache first, then network and refresh runtime cache.
+  event.respondWith(
+    caches.match(request).then(cached => {
+      if (cached) return cached;
+      return fetch(request).then(response => {
+        if (response && response.ok && response.type === 'basic') {
+          const copy = response.clone();
+          caches.open(CACHE_RUNTIME).then(cache => cache.put(request, copy));
+        }
+        return response;
+      });
+    })
+  );
 });
-self.addEventListener('message', (event) => { if (event.data && event.data.type === 'SKIP_WAITING') self.skipWaiting(); });

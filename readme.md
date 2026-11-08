@@ -2,10 +2,10 @@
 
 > **Laboratoire virtuel d'analyse physique & chimique** pour la spécialité Physique-Chimie (1ère & Terminale).
 
-![Version](https://img.shields.io/badge/version-1.0.0-6ee7b7)
+![Version](https://img.shields.io/badge/version-2.3.1-6ee7b7)
 ![PWA](https://img.shields.io/badge/PWA-ready-2c5364)
 ![Licence](https://img.shields.io/badge/©-M.Belarbi-red)
-![Langues](https://img.shields.io/badge/langues-FR%20%7C%20EN-blue)
+![Langues](https://img.shields.io/badge/interface-FR%20%7C%20EN-blue)
 
 ---
 
@@ -13,7 +13,7 @@
 
 **LABOPC** est une application web éducative interactive qui permet aux élèves de **Première et Terminale spécialité Physique-Chimie** de manipuler virtuellement les méthodes d'analyse du programme officiel.
 
-L'application fonctionne **hors ligne** après installation, sans compte, sans serveur, et s'installe comme une application native sur ordinateur, tablette ou smartphone (PWA).
+L'application est conçue pour fonctionner hors ligne après une première visite et peut être installée comme PWA sur les navigateurs compatibles. Le comportement hors ligne doit être confirmé sur le site publié et le navigateur cible.
 
 ---
 
@@ -49,7 +49,7 @@ L'application fonctionne **hors ligne** après installation, sans compte, sans s
 
 ### 🎯 Fonctionnalités transverses
 
-- 🌐 **Bilingue FR / EN** (bascule en haut à gauche)
+- 🌐 **Interface FR / EN** (menus bilingues ; certains textes internes aux simulations restent en français)
 - 🖨️ **Impression** des tableaux, graphes et démarches (PDF via navigateur)
 - 📱 **PWA installable** : icône, écran de lancement, mode hors ligne, mises à jour automatiques
 - 📐 **Choix des concentrations** avant chaque titrage
@@ -62,3 +62,18 @@ L'application fonctionne **hors ligne** après installation, sans compte, sans s
 ### Option 1 : Utiliser directement (aucune installation)
 
 Ouvrir l'URL de l'application dans un navigateur moderne :
+
+
+## 🧪 Vérifications et tests
+
+Le dépôt contient un test de fumée Node.js :
+
+```bash
+node tests/smoke-test.js
+```
+
+Il vérifie l'enregistrement des 15 activités, l'unicité de leurs identifiants, les chemins des icônes et plusieurs calculs de référence (Beer-Lambert, conductimétrie, Doppler, Venturi, dissolution et rendement).
+
+## ⚠️ Données scientifiques à confirmer
+
+Les coefficients d'absorption molaire du Cu²⁺, du BBT et du dichromate sont des paramètres indicatifs de simulation, pas des valeurs certifiées. Le coefficient du permanganate doit également être confirmé avec le spectrophotomètre et la cuve utilisés. Voir `DONNEES.md` et `RAPPORT-CORRECTIONS.md`.

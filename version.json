@@ -1,5 +1,6 @@
 {
-  "version": "1.0.0",
+  "version": "2.3.1",
   "date": "2025-01-15",
-  "notes": "Version initiale de LABOPC"
+  "notes": "Correctifs intégration des modules, PWA et cohérence des modèles",
+  "updated": "2026-11-07"
 }
