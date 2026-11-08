@@ -1,4 +1,4 @@
-const CACHE_VERSION = 'labopc-v2.1.0';
+const CACHE_VERSION = 'labopc-v2.2.0';
 const CACHE_STATIC = `${CACHE_VERSION}-static`;
 const CACHE_RUNTIME = `${CACHE_VERSION}-runtime`;
 const PRECACHE_URLS = [
