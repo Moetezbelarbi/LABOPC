@@ -1,10 +1,9 @@
-const CACHE_VERSION = 'labopc-v2.2.0';
+const CACHE_VERSION = 'labopc-v3.0.0';
 const CACHE_STATIC = `${CACHE_VERSION}-static`;
 const CACHE_RUNTIME = `${CACHE_VERSION}-runtime`;
 const PRECACHE_URLS = [
   './', './index.html', './manifest.json', './version.json',
   './icons/icon-192.png', './icons/icon-512.png', './icons/apple-touch-icon.png',
-  './js/app-core.js', './js/mod-chimie.js', './js/mod-physique.js'
 ];
 self.addEventListener('install', (event) => {
   event.waitUntil(caches.open(CACHE_STATIC).then(cache => cache.addAll(PRECACHE_URLS).catch(() => {})).then(() => self.skipWaiting()));
