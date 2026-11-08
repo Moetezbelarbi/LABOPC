@@ -6,7 +6,7 @@
 <title>LABOPC — Laboratoire Virtuel</title>
 <meta name="theme-color" content="#2c5364">
 <link rel="manifest" href="manifest.json">
-<link rel="apple-touch-icon" href="icons/apple-touch-icon.png">
+<link rel="apple-touch-icon" href="icon/apple-touch-icon.png">
 <style>
   :root {
     --bg-dark: #0f2027; --bg-mid: #203a43; --bg-light: #2c5364;
@@ -354,19 +354,18 @@ const REGISTRY = {
         ctx.fillStyle = '#f39c12'; ctx.fillRect(objX - 5, cy - 40, 10, 40); // Corps de la bougie
         ctx.fillStyle = '#e74c3c'; ctx.beginPath(); ctx.moveTo(objX, cy - 55); ctx.lineTo(objX - 5, cy - 45); ctx.lineTo(objX + 5, cy - 45); ctx.fill(); // Flamme
         
-        // Image : Bougie inversée
-        if (OA_prime > 0) {
-          const imgX = cx + OA_prime*scale; 
-          const h_img = 40 * (OA_prime / OA);
-          ctx.fillStyle = 'rgba(243, 156, 18, 0.5)'; ctx.fillRect(imgX - 5, cy, 10, h_img);
-          ctx.fillStyle = 'rgba(231, 76, 60, 0.5)'; ctx.beginPath(); ctx.moveTo(imgX, cy + h_img + 15); ctx.lineTo(imgX - 5, cy + h_img + 5); ctx.lineTo(imgX + 5, cy + h_img + 5); ctx.fill();
+        // Image : γ < 0 renversée, γ > 0 droite
+        if (isFinite(OA_prime)) {
+          const gam = OA_prime / OA, imgX = cx + OA_prime*scale, topY = cy - gam*40, up = gam > 0 ? -1 : 1;
+          ctx.fillStyle = 'rgba(243, 156, 18, 0.5)'; ctx.fillRect(imgX - 5, cy, 10, -gam*40);
+          ctx.fillStyle = 'rgba(231, 76, 60, 0.5)'; ctx.beginPath(); ctx.moveTo(imgX, topY + up*15); ctx.lineTo(imgX - 5, topY + up*5); ctx.lineTo(imgX + 5, topY + up*5); ctx.fill();
         }
 
         document.getElementById('lentille-steps').innerHTML = `
           <div class="steps-container">
             <h3>🧮 Démarche</h3>
             <div class="step-formula">1/OA' - 1/OA = 1/f'</div>
-            <div class="result-box"><p class="big">OA' = ${OA_prime.toFixed(1)} cm</p></div>
+            <div class="result-box"><p class="big">OA' = ${isFinite(OA_prime) ? OA_prime.toFixed(1) + ' cm' : 'infini'}</p>${isFinite(OA_prime) ? `<p>γ = OA'/OA = ${(OA_prime/OA).toFixed(2)} : image ${OA_prime > 0 ? 'réelle, renversée' : 'virtuelle, droite'}, ${Math.abs(OA_prime/OA) > 1 ? 'agrandie' : 'réduite'}</p>` : '<p>Objet au foyer : l’image se forme à l’infini.</p>'}</div>
           </div>
         `;
       }
@@ -433,7 +432,7 @@ const REGISTRY = {
             <label>Matière :</label>
             <select id="arch-mat" onchange="window.LABOPC_ACTIVE.calc()" style="padding:8px; border-radius:8px;">
               <option value="800">Bois (800 kg/m³)</option>
-              <option value="1000">Glace (1000 kg/m³)</option>
+              <option value="917">Glace (917 kg/m³)</option>
               <option value="2700">Aluminium (2700 kg/m³)</option>
               <option value="7800">Fer (7800 kg/m³)</option>
             </select>
@@ -583,8 +582,8 @@ const REGISTRY = {
   // --- SPECTROPHOTOMÉTRIE ---
   spectro: { domain: 'chimie', icon: '🌈', render: function(container, lang) {
     const SOLS = {
-      permanganate: { name: "KMnO₄", color: "#7b1fa2", lambda: 530, kTrue: 2300, unit: "mmol/L", conc: [0, 0.2, 0.4, 0.6, 0.8, 1.0], unk: 0.55 },
-      cuivre: { name: "CuSO₄", color: "#1565c0", lambda: 800, kTrue: 12.5, unit: "mmol/L", conc: [0, 20, 40, 60, 80, 100], unk: 55 }
+      permanganate: { name: "KMnO₄", color: "#7b1fa2", lambda: 530, kTrue: 2.3, unit: "mmol/L", conc: [0, 0.1, 0.2, 0.3, 0.4, 0.5], unk: 0.27 },
+      cuivre: { name: "CuSO₄", color: "#1565c0", lambda: 800, kTrue: 0.0125, unit: "mmol/L", conc: [0, 20, 40, 60, 80, 100], unk: 55 }
     };
     let currentSol = null, measured = {}, unkMeasured = null;
     
@@ -873,17 +872,14 @@ const REGISTRY = {
     let currentMode = null, currentExo = null, vol = 0, eqVol = 20, running = false, animId = null;
     
     function calcPH(v, type, pKa) {
-      const Va = 10/1000, Cb = 0.1, Vb = v/1000, Vtot = Va + Vb;
-      const nA = 0.1 * Va, nB = Cb * Vb;
-      if (type === 'fort') {
-        if (nB < nA) return -Math.log10((nA - nB) / Vtot);
-        if (nB > nA) return 14 + Math.log10((nB - nA) / Vtot);
-        return 7;
-      } else {
-        if (v < eqVol) { const ratio = nB / Math.max(1e-10, nA - nB); return pKa + Math.log10(ratio); }
-        if (v > eqVol) return 14 + Math.log10((nB - nA) / Vtot);
-        return 7;
+      const Va = 20, Ca = 0.1, Cb = 0.1, n = Va + v, a = Ca * Va / n, b = Cb * v / n;
+      const K = type === 'fort' ? 1e7 : Math.pow(10, -pKa);
+      let lo = -1, hi = 15;
+      for (let i = 0; i < 60; i++) {
+        const m = (lo + hi) / 2, h = Math.pow(10, -m);
+        if (b + h - 1e-14 / h - a * K / (K + h) > 0) lo = m; else hi = m;
       }
+      return (lo + hi) / 2;
     }
 
     function draw() {
@@ -1141,6 +1137,7 @@ const REGISTRY = {
 };
 
 // INITIALISATION
+if ('serviceWorker' in navigator) window.addEventListener('load', () => navigator.serviceWorker.register('sw.js').catch(() => {}));
 renderHome();
 </script>
 </body>
