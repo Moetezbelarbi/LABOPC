@@ -313,7 +313,8 @@ const PH = {
     const X = (v) => 52 + (v - o.x0) / (o.x1 - o.x0) * (W - 66), Y = (v) => H - 38 - (v - o.y0) / (o.y1 - o.y0) * (H - 52), tf = (v) => String(+v.toPrecision(3)).replace('.', ',');
     for (let i = 0; i <= 5; i++) { const xv = o.x0 + (o.x1 - o.x0) * i / 5, yv = o.y0 + (o.y1 - o.y0) * i / 5; g.strokeStyle = '#d6e4f0'; g.beginPath(); g.moveTo(X(xv), 10); g.lineTo(X(xv), H - 38); g.moveTo(52, Y(yv)); g.lineTo(W - 14, Y(yv)); g.stroke(); g.fillStyle = '#555'; g.textAlign = 'center'; g.fillText(tf(xv), X(xv), H - 22); g.textAlign = 'right'; g.fillText(tf(yv), 46, Y(yv) + 4); }
     g.fillStyle = '#222'; g.textAlign = 'center'; g.fillText(o.xl, W / 2, H - 5);
-    g.strokeStyle = '#c0392b'; g.lineWidth = 2; g.beginPath(); o.p.forEach((q, i) => g[i ? 'lineTo' : 'moveTo'](X(q[0]), Y(q[1]))); g.stroke();
+    if (o.p && o.p.length) { g.strokeStyle = '#c0392b'; g.lineWidth = 2; g.beginPath(); o.p.forEach((q, i) => g[i ? 'lineTo' : 'moveTo'](X(q[0]), Y(q[1]))); g.stroke(); }
+    if (o.d) { g.fillStyle = '#2c5364'; o.d.forEach((q) => { g.beginPath(); g.arc(X(q[0]), Y(q[1]), 4, 0, 7); g.fill(); }); }
   }
 };
 function lumiere(container, mode) {
@@ -348,128 +349,65 @@ function lumiere(container, mode) {
 
 const REGISTRY = {
   // --- CHUTE LIBRE ---
-  chute: { domain: 'physique', icon: '🪂', render: function(container, lang) {
-    container.innerHTML = `
-      <div class="info-box">Chute libre. Observez la chronophotographie et les vecteurs vitesse.</div>
-      <div class="sim-layout">
-        <div class="montage-frame"><canvas id="chute-canvas" width="400" height="400"></canvas></div>
-        <div class="controls-panel">
-          <div class="live-readout"><div class="lbl">VITESSE (m/s)</div><div id="chute-v">0.00</div></div>
-          <button class="btn success" id="chute-btn" onclick="window.LABOPC_ACTIVE.toggle()">▶ Lancer</button>
-        </div>
-      </div>
-    `;
-    let y = 20, v = 0, running = false, animId = null, lastTime = 0;
-    let traj = [];
+  chute: { domain: 'physique', icon: '🏀', render: function(container, lang) {
+    const { fr, nz, plot } = PH, $ = (s) => container.querySelector(s), g = 9.81, rho = 1.2, Cx = 0.47;
+    const OBJ = [['Bille d’acier (d = 2,0 cm, 33 g)', 0.02, 0.033], ['Balle de ping-pong (d = 4,0 cm, 2,7 g)', 0.04, 0.0027], ['Balle de tennis (d = 6,7 cm, 58 g)', 0.067, 0.058], ['Ballon de football (d = 22 cm, 430 g)', 0.22, 0.43]];
+    container.innerHTML = '<div class="info-box">Chute verticale sans vitesse initiale, filmée en chronophotographie (intervalle Δτ régulier, pointage à ±0,5 mm). Avec les frottements de l’air : F = ½·ρ·Cx·S·v² (ρ = 1,2 kg/m³, Cx = 0,47 pour une sphère). Détermine g à partir de v(t).</div>' +
+      '<div class="input-group"><label>Objet :</label><select id="o">' + OBJ.map((o, i) => '<option value="' + i + '">' + o[0] + '</option>').join('') + '</select><label>Hauteur (m) :</label><input type="range" id="h" min="0.5" max="20" step="0.5" value="5" style="width:130px"><b id="hv"></b></div>' +
+      '<div class="input-group"><label>Δτ :</label><select id="dt"><option value="0.02">20 ms</option><option value="0.04" selected>40 ms</option><option value="0.06">60 ms</option><option value="0.08">80 ms</option></select><label><input type="checkbox" id="fr"> frottements de l’air</label><button class="btn success" id="go">Lâcher</button></div><canvas id="ch" style="height:300px"></canvas><canvas id="vt"></canvas><div id="out" class="result-box"></div><div class="tw" style="max-height:200px;overflow:auto"><table><tr><th>t (s)</th><th>y (cm)</th><th>v (m/s)</th></tr><tbody id="tb"></tbody></table></div>';
+    let R = null;
+    function sim() {
+      const o = OBJ[+$('#o').value], H = +$('#h').value, dtc = +$('#dt').value, A = Math.PI * o[1] * o[1] / 4, k = $('#fr').checked ? 0.5 * rho * Cx * A / o[2] : 0, h = 0.0005, per = Math.round(dtc / h), P = [[0, 0]];
+      let y = 0, v = 0, n = 0; while (y < H && n < 400000) { v += (g - k * v * v) * h; y += v * h; n++; if (n % per === 0 && y < H) P.push([n * h, y + 0.0005 * nz()]); }
+      const V = []; for (let i = 1; i < P.length - 1; i++) V.push([P[i][0], (P[i + 1][1] - P[i - 1][1]) / (2 * dtc)]);
+      let sl = null; if (V.length > 2) { const m = V.length, mt = V.reduce((a, q) => a + q[0], 0) / m, mv = V.reduce((a, q) => a + q[1], 0) / m; let a = 0, b = 0; V.forEach((q) => { a += (q[0] - mt) * (q[1] - mv); b += (q[0] - mt) * (q[0] - mt); }); sl = a / b; R = { V, sl, mt, mv }; }
+      const vl = k ? Math.sqrt(g / k) : null; R = { P, V, sl, vl, o, H, T: n * h, vend: v, k };
+      $('#hv').textContent = fr(H, 1) + ' m';
+      $('#tb').innerHTML = P.map((q, i) => '<tr><td>' + fr(q[0], 2) + '</td><td>' + fr(q[1] * 100, 1) + '</td><td>' + (i > 0 && i < P.length - 1 ? fr(V[i - 1][1], 2) : '—') + '</td></tr>').join('');
+      $('#out').innerHTML = (sl == null ? 'Trop peu de points : choisis une hauteur plus grande ou un Δτ plus petit.' : 'Pente de v(t) ≈ <b>' + fr(sl, 2) + ' m/s²</b>') + (k ? '<br>Vitesse limite théorique : ' + fr(vl, 1) + ' m/s · durée de chute ≈ ' + fr(n * h, 2) + ' s' : '<br>Chute libre (sans frottements) : v(t) est une droite.');
+      draw();
+    }
     function draw() {
-      const canvas = document.getElementById('chute-canvas'); if (!canvas) return;
-      const ctx = canvas.getContext('2d'); ctx.clearRect(0,0,400,400);
-      ctx.fillStyle = '#f8fafc'; ctx.fillRect(0,0,400,400);
-      ctx.fillStyle = '#dce5ee'; ctx.fillRect(0, 380, 400, 20);
-      
-      // Chronophotographie
-      ctx.fillStyle = 'rgba(84, 110, 122, 0.3)';
-      traj.forEach(pos => { ctx.beginPath(); ctx.arc(200, 380 - pos, 10, 0, 2*Math.PI); ctx.fill(); });
-      
-      // Objet
-      ctx.fillStyle = '#546e7a'; ctx.beginPath(); ctx.arc(200, 380 - y, 10, 0, 2*Math.PI); ctx.fill();
-      
-      // Vecteur vitesse
-      if (running || v !== 0) {
-        ctx.strokeStyle = '#e63946'; ctx.lineWidth = 2;
-        const vy = v * 10; // Échelle visuelle
-        if (vy > 0) {
-          ctx.beginPath(); ctx.moveTo(200, 380 - y); ctx.lineTo(200, 380 - y + vy); ctx.stroke();
-          ctx.beginPath(); ctx.moveTo(200, 380 - y + vy); ctx.lineTo(195, 380 - y + vy - 5); ctx.lineTo(205, 380 - y + vy - 5); ctx.fill();
-        }
-      }
+      if (!R) return; const c = $('#ch'), r = window.devicePixelRatio || 1, W = c.clientWidth || 300, Hh = 300; c.width = W * r; c.height = Hh * r; const g2 = c.getContext('2d'); g2.setTransform(r, 0, 0, r, 0, 0);
+      const Y = (m) => 12 + m / R.H * (Hh - 24); g2.fillStyle = '#222'; g2.font = '11px sans-serif'; g2.textAlign = 'left';
+      const st = R.H > 10 ? 2 : R.H > 4 ? 1 : 0.5; for (let m = 0; m <= R.H + 1e-9; m += st) { g2.fillRect(20, Y(m), 10, 1); g2.fillText(fr(m, st < 1 ? 1 : 0) + ' m', 34, Y(m) + 4); }
+      g2.fillStyle = '#e67e22'; R.P.forEach((q) => { g2.beginPath(); g2.arc(W / 2, Y(q[1]), Math.max(3, Math.min(12, R.o[1] * 100 / 2)), 0, 7); g2.fill(); });
+      const d = R.V.map((q) => [q[0], q[1]]); if (d.length) plot($('#vt'), { x0: 0, x1: R.T, y0: 0, y1: Math.max(1, ...d.map((q) => q[1])) * 1.1, xl: 't (s) — vitesse v (m/s)', p: [], d, h: 220 });
     }
-    function loop(time) {
-      if (!running) return;
-      if (!lastTime) lastTime = time;
-      const dt = (time - lastTime) / 1000; lastTime = time;
-      
-      v += 9.81 * dt;
-      y += v * dt * 20; 
-      if (y > 380) { y = 380; v = 0; running = false; document.getElementById('chute-btn').textContent = '▶ Relancer'; }
-      
-      if (Math.random() < 0.1) traj.push(y); // Chronophotographie
-      
-      document.getElementById('chute-v').textContent = v.toFixed(2);
-      draw(); animId = requestAnimationFrame(loop);
-    }
-    window.LABOPC_ACTIVE = {
-      toggle: () => {
-        if (y >= 380) { y = 20; v = 0; traj = []; }
-        running = !running; lastTime = 0;
-        document.getElementById('chute-btn').textContent = running ? '⏸ Arrêter' : '▶ Lancer';
-        if (running) animId = requestAnimationFrame(loop);
-        else if (animId) cancelAnimationFrame(animId);
-      }
-    };
-    draw();
-    return function cleanup() { running = false; if (animId) cancelAnimationFrame(animId); delete window.LABOPC_ACTIVE; };
+    $('#go').addEventListener('click', sim); ['o', 'h', 'dt', 'fr'].forEach((i) => $('#' + i).addEventListener('change', sim)); const rs = () => draw(); window.addEventListener('resize', rs); sim();
+    return () => window.removeEventListener('resize', rs);
   }},
-
-  // --- DIFFRACTION ---
   diffraction: { domain: 'physique', icon: '💡', render: function(container, lang) { return lumiere(container, 'dif'); }},
   lentille: { domain: 'physique', icon: '🔎', render: function(container, lang) {
-    container.innerHTML = `
-      <div class="info-box">Lentille mince. Modifiez la focale et la distance.</div>
-      <div class="sim-layout">
-        <div class="montage-frame"><canvas id="lentille-canvas" width="600" height="250"></canvas></div>
-        <div class="controls-panel">
-          <div class="input-group"><label>Distance focale f' (cm) :</label> <input type="range" id="lentille-f" min="5" max="30" value="10" step="1" oninput="window.LABOPC_ACTIVE.calc()"></div>
-          <div class="input-group"><label>Distance objet OA (cm) :</label> <input type="range" id="lentille-oa" min="5" max="40" value="15" step="1" oninput="window.LABOPC_ACTIVE.calc()"></div>
-          <div id="lentille-steps"></div>
-        </div>
-      </div>
-    `;
-    window.LABOPC_ACTIVE = {
-      calc: () => {
-        const f = parseFloat(document.getElementById('lentille-f').value);
-        const val = parseFloat(document.getElementById('lentille-oa').value);
-        const OA = -val;
-        const OA_prime = (f * OA) / (OA + f);
-        
-        const canvas = document.getElementById('lentille-canvas'); if (!canvas) return;
-        const ctx = canvas.getContext('2d'); const w = canvas.width, h = canvas.height, cx = w/2, cy = h/2, scale = 6;
-        ctx.clearRect(0,0,w,h);
-        ctx.beginPath(); ctx.moveTo(0, cy); ctx.lineTo(w, cy); ctx.strokeStyle = '#ccc'; ctx.stroke();
-        
-        // Lentille (épaisseur selon focale)
-        const thick = 20 - (f / 30) * 15; // Plus la focale est courte, plus c'est épais
-        ctx.beginPath(); ctx.ellipse(cx, cy, thick, 70, 0, 0, 2*Math.PI); ctx.strokeStyle = '#2c5364'; ctx.lineWidth = 2; ctx.fillStyle = 'rgba(44, 83, 100, 0.2)'; ctx.fill(); ctx.stroke();
-        
-        // Foyers
-        ctx.fillStyle = '#e74c3c'; ctx.beginPath(); ctx.arc(cx - f*scale, cy, 4, 0, 2*Math.PI); ctx.fill(); ctx.beginPath(); ctx.arc(cx + f*scale, cy, 4, 0, 2*Math.PI); ctx.fill();
-        
-        // Objet : Bougie
-        const objX = cx + OA*scale; 
-        ctx.fillStyle = '#f39c12'; ctx.fillRect(objX - 5, cy - 40, 10, 40); // Corps de la bougie
-        ctx.fillStyle = '#e74c3c'; ctx.beginPath(); ctx.moveTo(objX, cy - 55); ctx.lineTo(objX - 5, cy - 45); ctx.lineTo(objX + 5, cy - 45); ctx.fill(); // Flamme
-        
-        // Image : γ < 0 renversée, γ > 0 droite
-        if (isFinite(OA_prime)) {
-          const gam = OA_prime / OA, imgX = cx + OA_prime*scale, topY = cy - gam*40, up = gam > 0 ? -1 : 1;
-          ctx.fillStyle = 'rgba(243, 156, 18, 0.5)'; ctx.fillRect(imgX - 5, cy, 10, -gam*40);
-          ctx.fillStyle = 'rgba(231, 76, 60, 0.5)'; ctx.beginPath(); ctx.moveTo(imgX, topY + up*15); ctx.lineTo(imgX - 5, topY + up*5); ctx.lineTo(imgX + 5, topY + up*5); ctx.fill();
-        }
-
-        document.getElementById('lentille-steps').innerHTML = `
-          <div class="steps-container">
-            <h3>🧮 Démarche</h3>
-            <div class="step-formula">1/OA' - 1/OA = 1/f'</div>
-            <div class="result-box"><p class="big">OA' = ${isFinite(OA_prime) ? OA_prime.toFixed(1) + ' cm' : 'infini'}</p>${isFinite(OA_prime) ? `<p>γ = OA'/OA = ${(OA_prime/OA).toFixed(2)} : image ${OA_prime > 0 ? 'réelle, renversée' : 'virtuelle, droite'}, ${Math.abs(OA_prime/OA) > 1 ? 'agrandie' : 'réduite'}</p>` : '<p>Objet au foyer : l’image se forme à l’infini.</p>'}</div>
-          </div>
-        `;
+    const { fr, nz } = PH, $ = (s) => container.querySelector(s), f = [8, 10, 12.5, 15, 20][Math.floor(Math.random() * 5)], S = { xo: 20, xs: 80, rows: [] };
+    container.innerHTML = '<div class="info-box">Banc d’optique (0–100 cm) : objet-flèche de 2,0 cm, lentille mince convergente fixée à 50 cm, de distance focale <b>f′ inconnue</b>, écran mobile. Obtiens des images nettes pour plusieurs positions de l’objet, note OA et OA′, puis déduis f′ avec 1/OA′ − 1/OA = 1/f′.</div>' +
+      '<div class="input-group"><label>Objet (cm) :</label><input type="range" id="xo" min="0" max="45" step="0.5" value="20" style="width:200px"><b id="xov"></b></div><div class="input-group"><label>Écran (cm) :</label><input type="range" id="xs" min="52" max="100" step="0.5" value="80" style="width:200px"><b id="xsv"></b><label><input type="checkbox" id="rays" checked> rayons</label></div>' +
+      '<canvas id="cv" style="height:230px"></canvas><div id="out" class="result-box"></div><div class="row"><button class="btn success" id="note">Noter (OA, OA′)</button><button class="btn danger" id="clr">Effacer</button></div><div class="tw"><table><tr><th>OA (cm)</th><th>OA′ (cm)</th><th>1/OA′ − 1/OA (cm⁻¹)</th></tr><tbody id="tb"></tbody></table></div><button class="btn success" id="calc">Calculer f′</button><div id="res"></div>';
+    const geo = () => { const OA = S.xo - 50, den = OA + f, Op = Math.abs(den) < 1e-6 ? Infinity : f * OA / den; return { OA, Op, xi: 50 + Op, gam: Op / OA, d: Math.abs(S.xs - 50 - Op) }; };
+    function draw() {
+      const G = geo(), cv = $('#cv'), r = window.devicePixelRatio || 1, W = cv.clientWidth || 600, H = 230; cv.width = W * r; cv.height = H * r; const g = cv.getContext('2d'); g.setTransform(r, 0, 0, r, 0, 0);
+      const s = (W - 20) / 100, X = (x) => 10 + x * s, cy = 115, ky = 3 * s;
+      g.strokeStyle = '#999'; g.beginPath(); g.moveTo(10, cy); g.lineTo(W - 10, cy); g.stroke(); g.fillStyle = '#555'; g.font = '10px sans-serif'; g.textAlign = 'center';
+      for (let x = 0; x <= 100; x += 10) { g.fillRect(X(x), cy, 1, 6); g.fillText(x, X(x), cy + 18); }
+      g.strokeStyle = '#2c5364'; g.lineWidth = 3; g.beginPath(); g.ellipse(X(50), cy, 7, 70, 0, 0, 7); g.stroke(); g.lineWidth = 1;
+      const hO = 2 * ky; g.strokeStyle = g.fillStyle = '#3498db'; g.lineWidth = 3; g.beginPath(); g.moveTo(X(S.xo), cy); g.lineTo(X(S.xo), cy - hO); g.stroke(); g.lineWidth = 1;
+      g.strokeStyle = '#444'; g.lineWidth = 3; g.beginPath(); g.moveTo(X(S.xs), cy - 80); g.lineTo(X(S.xs), cy + 80); g.stroke(); g.lineWidth = 1;
+      const fin = isFinite(G.Op), tipI = fin ? cy - G.gam * hO : cy;
+      if ($('#rays').checked && fin) {
+        g.strokeStyle = '#e67e22'; const ray = (x1, y1, x2, y2, ext) => { g.beginPath(); g.moveTo(x1, y1); g.lineTo(x2, y2); const dx = x2 - x1, dy = y2 - y1; if (ext) { g.lineTo(x2 + dx * 3, y2 + dy * 3); } g.stroke(); };
+        const real = G.Op > 0; ray(X(S.xo), cy - hO, X(50), cy - hO, 0); ray(X(S.xo), cy - hO, X(50), cy, 0);
+        if (real) { ray(X(50), cy - hO, X(G.xi), tipI, 1); ray(X(50), cy, X(G.xi), tipI, 1); } else { g.setLineDash([4, 4]); ray(X(50), cy - hO, X(G.xi), tipI, 0); g.setLineDash([]); ray(X(50), cy - hO, X(50) + (X(50) - X(G.xi)) * 2, cy - hO + (cy - hO - tipI) * 2, 0); ray(X(50), cy, X(50) + (X(50) - X(S.xo)), cy + hO, 0); }
       }
-    };
-    window.LABOPC_ACTIVE.calc();
-    return function cleanup() { delete window.LABOPC_ACTIVE; };
+      if (fin && G.Op > 0) { g.strokeStyle = g.fillStyle = '#27ae60'; g.lineWidth = 3; g.globalAlpha = Math.max(0.15, 1 - G.d / 6); g.beginPath(); g.moveTo(X(G.xi), cy); g.lineTo(X(G.xi), tipI); g.stroke(); g.globalAlpha = 1; g.lineWidth = 1; }
+      $('#xov').textContent = S.xo + ' cm'; $('#xsv').textContent = S.xs + ' cm';
+      $('#out').innerHTML = 'OA = ' + fr(G.OA, 1) + ' cm · écran à OA′ = ' + fr(S.xs - 50, 1) + ' cm<br>' + (!fin ? 'Objet au foyer : l’image est à l’infini.' : G.Op < 0 ? 'Pas d’image sur l’écran : image virtuelle (l’objet est entre le foyer et la lentille).' : G.d < 1.5 ? '<b>Image nette</b> sur l’écran' : 'Image floue : ajuste la position de l’écran.');
+    }
+    S.draw = draw; ['xo', 'xs', 'rays'].forEach((i) => $('#' + i).addEventListener('input', () => { S.xo = +$('#xo').value; S.xs = +$('#xs').value; draw(); }));
+    $('#note').addEventListener('click', () => { const G = geo(); if (!isFinite(G.Op) || G.Op <= 0 || G.d >= 1.5) { $('#res').innerHTML = '<div class="warning-box">Pas d’image nette sur l’écran : ajuste d’abord l’écran.</div>'; return; } $('#res').innerHTML = ''; S.rows.push([G.OA + 0.15 * nz(), S.xs - 50 + 0.15 * nz()]); S.rows.sort((a, b) => a[0] - b[0]); $('#tb').innerHTML = S.rows.map((q) => '<tr><td>' + fr(q[0], 1) + '</td><td>' + fr(q[1], 1) + '</td><td>' + fr(1 / q[1] - 1 / q[0], 4) + '</td></tr>').join(''); });
+    $('#clr').addEventListener('click', () => { S.rows = []; $('#tb').innerHTML = ''; $('#res').innerHTML = ''; });
+    $('#calc').addEventListener('click', () => { const R = $('#res'), w = S.rows; if (w.length < 3 || Math.max(...w.map((q) => q[0])) - Math.min(...w.map((q) => q[0])) < 6) { R.innerHTML = '<div class="warning-box">Note au moins 3 positions nettes bien différentes de l’objet.</div>'; return; } const m = w.reduce((a, q) => a + 1 / q[1] - 1 / q[0], 0) / w.length, fe = 1 / m; R.innerHTML = '<div class="result-box"><p>f′ = 1 / moyenne(1/OA′ − 1/OA)</p><p class="big">f′ ≈ ' + fr(fe, 1) + ' cm (C ≈ ' + fr(100 / fe, 1) + ' δ)</p></div><details class="box"><summary>Voir la valeur attendue</summary>f′ = ' + fr(f, 1) + ' cm · écart : ' + fr(Math.abs(fe - f) / f * 100, 1) + ' %</details>'; });
+    draw(); const rs = () => draw(); window.addEventListener('resize', rs); return () => window.removeEventListener('resize', rs);
   }},
-
-  // --- VENTURI ---
   venturi: { domain: 'physique', icon: '🌪️', render: function(container, lang) {
     const { fr, nz } = PH, $ = (s) => container.querySelector(s), g = 9.81, rho = 998, P1 = 12000, S = { D1: 10, D2: 5, Q: 300, hid: null };
     container.innerHTML = '<div class="info-box">Tube de Venturi horizontal rempli d’eau (ρ = 998 kg/m³ à 20 °C), pression relative en amont P₁ = 12 kPa. Règle D₁, D₂ et le débit Q : les tubes piézométriques donnent les pressions. Avec « Débit inconnu », déduis Q de la différence de hauteur Δh.</div>' +
@@ -692,126 +630,58 @@ const REGISTRY = {
     return function cleanup() { stopAll(); window.removeEventListener('resize', onResize); };
   }},
   dissolution: { domain: 'chimie', icon: '⚖️', render: function(container, lang) {
-    container.innerHTML = `
-      <div class="info-box">Choisissez le type de préparation.</div>
-      <div class="choices">
-        <div class="card" onclick="window.LABOPC_ACTIVE.show('dissolution')"><div class="title">Dissolution</div><div class="desc">Solide → Solution</div></div>
-        <div class="card" onclick="window.LABOPC_ACTIVE.show('dilution')"><div class="title">Dilution</div><div class="desc">Solution mère → Solution fille</div></div>
-      </div>
-      <div id="prep-area" style="margin-top:20px;"></div>
-    `;
-    window.LABOPC_ACTIVE = {
-      show: (type) => {
-        if (type === 'dissolution') {
-          const m = 0.1 * 0.100 * 159.6;
-          document.getElementById('prep-area').innerHTML = `
-            <div class="sim-layout">
-              <div class="montage-frame">
-                <svg width="200" height="250" viewBox="0 0 200 250">
-                  <rect x="20" y="200" width="160" height="20" fill="#546e7a" rx="4"/>
-                  <rect x="90" y="170" width="20" height="30" fill="#90a4ae"/>
-                  <ellipse cx="100" cy="170" rx="60" ry="10" fill="#b0bec5"/>
-                  <path d="M 80 50 L 80 150 Q 80 180 100 180 Q 120 180 120 150 L 120 50" fill="#eaf4fa" stroke="#7a8fa3" stroke-width="2"/>
-                  <line x1="80" y1="70" x2="120" y2="70" stroke="#333" stroke-width="1"/>
-                  <rect x="82" y="100" width="36" height="78" fill="#1565c0" opacity="0.6"/>
-                </svg>
-              </div>
-              <div class="controls-panel">
-                <div class="steps-container">
-                  <h3>🧮 Protocole (Dissolution)</h3>
-                  <div class="step-item"><div class="step-number">1</div><div class="step-body"><div class="step-title">Calculer la masse</div><div class="step-formula">m = C × V × M</div><div class="step-calc">m = 0,1 × 0,100 × 159,6 = ${m.toFixed(2)} g</div></div></div>
-                  <div class="step-item"><div class="step-number">2</div><div class="step-body"><div class="step-title">Peser</div><p class="small">Peser ${m.toFixed(2)} g de poudre.</p></div></div>
-                  <div class="step-item"><div class="step-number">3</div><div class="step-body"><div class="step-title">Dissoudre</div><p class="small">Mettre dans un bécher + eau + agiter.</p></div></div>
-                  <div class="step-item"><div class="step-number">4</div><div class="step-body"><div class="step-title">Fiole jaugée</div><p class="small">Transvaser et compléter à 100 mL.</p></div></div>
-                  <div class="result-box"><p class="big">Solution prête à 0,1 mol/L</p></div>
-                </div>
-              </div>
-            </div>
-          `;
-        } else {
-          document.getElementById('prep-area').innerHTML = `
-            <div class="sim-layout">
-              <div class="montage-frame">
-                <svg width="200" height="250" viewBox="0 0 200 250">
-                  <path d="M 40 50 L 40 100 Q 40 120 55 120 Q 70 120 70 100 L 70 50" fill="#eaf4fa" stroke="#7a8fa3" stroke-width="2"/>
-                  <rect x="42" y="60" width="26" height="50" fill="#1565c0" opacity="0.6"/>
-                  <path d="M 110 50 L 110 180 Q 110 200 125 200 Q 140 200 140 180 L 140 50" fill="#eaf4fa" stroke="#7a8fa3" stroke-width="2"/>
-                  <line x1="110" y1="70" x2="140" y2="70" stroke="#333" stroke-width="1"/>
-                  <rect x="112" y="100" width="26" height="100" fill="#1565c0" opacity="0.3"/>
-                </svg>
-              </div>
-              <div class="controls-panel">
-                <div class="steps-container">
-                  <h3>🧮 Protocole (Dilution)</h3>
-                  <div class="step-item"><div class="step-number">1</div><div class="step-body"><div class="step-title">Prélever</div><p class="small">Prélever V_mère = 20 mL avec une pipette jaugée.</p></div></div>
-                  <div class="step-item"><div class="step-number">2</div><div class="step-body"><div class="step-title">Transvaser</div><p class="small">Verser dans une fiole jaugée de 100 mL.</p></div></div>
-                  <div class="step-item"><div class="step-number">3</div><div class="step-body"><div class="step-title">Compléter</div><p class="small">Ajouter de l'eau distillée jusqu'au trait de jauge et homogénéiser.</p></div></div>
-                  <div class="result-box"><p class="big">C_fille = C_mère / 5</p></div>
-                </div>
-              </div>
-            </div>
-          `;
-        }
-      }
-    };
-    return function cleanup() { delete window.LABOPC_ACTIVE; };
+    const { fr, nz } = PH, $ = (s) => container.querySelector(s), pick = (a) => a[Math.floor(Math.random() * a.length)];
+    const SOL = [['Sulfate de cuivre pentahydraté CuSO₄·5H₂O', 249.68], ['Chlorure de sodium NaCl', 58.44], ['Permanganate de potassium KMnO₄', 158.03], ['Chlorure de potassium KCl', 74.55]], FIO = { 50: 0.06, 100: 0.1, 250: 0.15 }, PIP = { 1: 0.007, 2: 0.01, 5: 0.015, 10: 0.02, 20: 0.03, 25: 0.03 };
+    let T = null, mode = 'dis';
+    const sig = (x) => String(+x.toPrecision(3)).replace('.', ',');
+    function dis() {
+      let s, V, C, m; do { s = pick(SOL); V = pick([50, 100, 250]); C = pick([0.05, 0.1, 0.2, 0.5]); m = C * V / 1000 * s[1]; } while (m < 0.5 || m > 30);
+      T = { s, V, C, m, w: null }; const bal = '<div class="live-readout"><div class="lbl">BALANCE (g)</div><div id="bal">0,00</div></div>';
+      $('#zone').innerHTML = '<div class="info-box">Prépare <b>' + V + ' mL</b> de solution de <b>' + s[0] + '</b> à <b>' + sig(C) + ' mol/L</b> (M = ' + fr(s[1], 2) + ' g/mol). Calcule la masse à peser, pèse-la (balance au centième de gramme), choisis la fiole jaugée puis complète au trait de jauge.</div>' + bal +
+        '<div class="input-group"><label>Masse à peser (g) :</label><input type="text" id="m" inputmode="decimal" style="width:90px"><button class="btn" id="pe">Peser</button><label>Fiole jaugée :</label><select id="fi">' + Object.keys(FIO).map((k) => '<option>' + k + '</option>').join('') + '</select><button class="btn success" id="dis">Dissoudre et compléter au trait</button></div><div id="res"></div>';
+      $('#pe').addEventListener('click', () => { if (!$('#m')) return; const x = parseFloat($('#m').value.replace(',', '.')); if (!(x > 0)) { $('#res').innerHTML = '<div class="warning-box">Saisis la masse à peser.</div>'; return; } T.w = Math.round((x + 0.008 * nz()) * 100) / 100; $('#bal').textContent = fr(T.w, 2); $('#res').innerHTML = ''; });
+      $('#dis').addEventListener('click', () => { if (!$('#fi') || !$('#bal')) return; if (T.w == null) { $('#res').innerHTML = '<div class="warning-box">Pèse d’abord le solide.</div>'; return; } const Vf = +$('#fi').value; if (Vf !== T.V) { $('#res').innerHTML = '<div class="warning-box">La fiole choisie (' + Vf + ' mL) ne correspond pas au volume demandé (' + T.V + ' mL).</div>'; return; }
+        const Ce = T.w / (T.s[1] * Vf * (1 + FIO[Vf] / Vf * nz() / 1.7) / 1000), u = Ce * Math.sqrt(Math.pow(0.005 / T.w, 2) + Math.pow(FIO[Vf] / 1.73 / Vf, 2)), e = Math.abs(Ce - T.C) / T.C * 100;
+        $('#res').innerHTML = '<div class="result-box"><p>C = m / (M·V) = ' + fr(T.w, 2) + ' / (' + fr(T.s[1], 2) + ' × ' + fr(Vf / 1000, 3) + ')</p><p class="big">C = ' + sig(Ce) + ' ± ' + sig(u) + ' mol/L</p><p class="small">' + (e < 1 ? 'Solution conforme (écart ' + fr(e, 1) + ' % avec la consigne).' : 'Écart de ' + fr(e, 1) + ' % avec la consigne : la masse pesée est trop éloignée de m = C·V·M. Recommence.') + '</p></div>'; });
+    }
+    function dil() {
+      let F, Vf, Vp; do { F = pick([2, 4, 5, 10, 20, 25, 50]); Vf = pick([50, 100, 250]); Vp = Vf / F; } while (!PIP[Vp]); const C0 = pick([0.1, 0.2, 0.5]); T = { C0, Cf: C0 / F, Vf };
+      $('#zone').innerHTML = '<div class="info-box">Solution mère : <b>' + sig(C0) + ' mol/L</b>. Prépare <b>' + Vf + ' mL</b> de solution fille à <b>' + sig(C0 / F) + ' mol/L</b>. Choisis la pipette jaugée et la fiole jaugée.</div><div class="input-group"><label>Pipette jaugée (mL) :</label><select id="pi">' + Object.keys(PIP).map((k) => '<option>' + k + '</option>').join('') + '</select><label>Fiole jaugée (mL) :</label><select id="fi">' + Object.keys(FIO).map((k) => '<option' + (+k === Vf ? ' selected' : '') + '>' + k + '</option>').join('') + '</select><button class="btn success" id="pr">Préparer</button></div><div id="res"></div>';
+      $('#pr').addEventListener('click', () => { if (!$('#pi')) return; const p = +$('#pi').value, f = +$('#fi').value; if (f !== T.Vf) { $('#res').innerHTML = '<div class="warning-box">Il faut une fiole de ' + T.Vf + ' mL.</div>'; return; }
+        const Co = T.C0 * p * (1 + PIP[p] / p * nz() / 1.7) / (f * (1 + FIO[f] / f * nz() / 1.7)), u = Co * Math.sqrt(Math.pow(PIP[p] / 1.73 / p, 2) + Math.pow(FIO[f] / 1.73 / f, 2)), e = Math.abs(Co - T.Cf) / T.Cf * 100;
+        $('#res').innerHTML = '<div class="result-box"><p>C<sub>fille</sub> = C<sub>mère</sub>·V<sub>prélevé</sub> / V<sub>fiole</sub></p><p class="big">C = ' + sig(Co) + ' ± ' + sig(u) + ' mol/L</p><p class="small">' + (e < 2 ? 'Dilution correcte (facteur ' + fr(f / p, 0) + ').' : 'Facteur de dilution obtenu : ' + fr(f / p, 1) + ', demandé : ' + fr(T.C0 / T.Cf, 0) + '. Choisis une autre pipette.') + '</p></div>'; });
+    }
+    container.innerHTML = '<div class="row"><button class="btn" id="t1">Par dissolution</button><button class="btn secondary" id="t2">Par dilution</button><button class="btn secondary" id="nw">Nouvelle consigne</button></div><div id="zone"></div>';
+    const go = (m) => { mode = m; $('#t1').className = 'btn' + (m === 'dis' ? '' : ' secondary'); $('#t2').className = 'btn' + (m === 'dil' ? '' : ' secondary'); m === 'dis' ? dis() : dil(); };
+    $('#t1').addEventListener('click', () => go('dis')); $('#t2').addEventListener('click', () => go('dil')); $('#nw').addEventListener('click', () => go(mode)); go('dis'); return () => {};
   }},
-
-  // --- BOYLE ---
   boyle: { domain: 'chimie', icon: '💨', render: function(container, lang) {
-    container.innerHTML = `
-      <div class="info-box">Loi de Boyle-Mariotte : P × V = constante (à T constante).</div>
-      <div class="sim-layout">
-        <div class="montage-frame">
-          <svg width="150" height="200" viewBox="0 0 150 200">
-            <rect x="50" y="20" width="50" height="160" fill="#f0f4f8" stroke="#7a8fa3" stroke-width="2" rx="4"/>
-            <rect id="boyle-piston-svg" x="52" y="60" width="46" height="10" fill="#546e7a"/>
-            <rect id="boyle-rod-svg" x="70" y="0" width="10" height="60" fill="#90a4ae"/>
-            <rect id="boyle-gas-svg" x="52" y="70" width="46" height="108" fill="#e0f7fa" opacity="0.5"/>
-            <!-- Graduations -->
-            <line x1="50" y1="40" x2="60" y2="40" stroke="#ccc"/>
-            <line x1="50" y1="80" x2="60" y2="80" stroke="#ccc"/>
-            <line x1="50" y1="120" x2="60" y2="120" stroke="#ccc"/>
-            <line x1="50" y1="160" x2="60" y2="160" stroke="#ccc"/>
-          </svg>
-        </div>
-        <div class="controls-panel">
-          <div class="live-readout"><div class="lbl">PRESSION P (hPa)</div><div id="boyle-p">1013</div></div>
-          <div class="live-readout" style="margin-top:8px;"><div class="lbl">VOLUME V (mL)</div><div id="boyle-v">20.0</div></div>
-          <div class="input-group"><label>Volume (mL) :</label> <input type="range" id="boyle-slider" min="10" max="40" value="20" step="1" oninput="window.LABOPC_ACTIVE.calc(this.value)" style="width:100%;"></div>
-        </div>
-      </div>
-      <div id="boyle-steps"></div>
-    `;
-    window.LABOPC_ACTIVE = {
-      calc: (val) => {
-        const V = parseFloat(val); const P = (1013 * 20) / V;
-        document.getElementById('boyle-v').textContent = V.toFixed(1);
-        document.getElementById('boyle-p').textContent = P.toFixed(0);
-        
-        // Mouvement du piston
-        const pistonY = 160 - (V - 10) * 4;
-        document.getElementById('boyle-piston-svg').setAttribute('y', pistonY);
-        document.getElementById('boyle-rod-svg').setAttribute('y', pistonY - 60);
-        document.getElementById('boyle-gas-svg').setAttribute('y', pistonY + 10);
-        document.getElementById('boyle-gas-svg').setAttribute('height', 178 - pistonY);
-
-        document.getElementById('boyle-steps').innerHTML = `
-          <div class="steps-container">
-            <h3>🧮 Démarche</h3>
-            <div class="step-item"><div class="step-number">1</div><div class="step-body"><div class="step-title">Loi de Boyle-Mariotte</div><div class="step-formula">P₁ × V₁ = P₂ × V₂</div></div></div>
-            <div class="step-item"><div class="step-number">2</div><div class="step-body"><div class="step-title">Calcul de la pression pour le nouveau volume</div><div class="step-calc">P₂ = (P₁ × V₁) / V₂ = (1013 × 20) / ${V}</div><div class="result-box"><p class="big">P = ${P.toFixed(0)} hPa | P × V = ${(P*V).toFixed(0)}</p></div></div></div>
-          </div>
-        `;
-      }
-    };
-    window.LABOPC_ACTIVE.calc(20);
-    return function cleanup() { delete window.LABOPC_ACTIVE; };
+    const { fr, nz, plot } = PH, $ = (s) => container.querySelector(s), Rg = 8.314, V0 = 1.5 + Math.round(Math.random() * 30) / 10, n = 101300 * (20 + V0) * 1e-6 / (Rg * 293.15), S = { V: 20, T: 20, rows: [] };
+    container.innerHTML = '<div class="info-box">Seringue d’air reliée à un capteur de pression par un tube : le <b>volume mort V₀ est inconnu</b>. La quantité d’air (n) est constante. Règle V et θ, note p (résolution 0,1 kPa) puis trace 1/p = f(V) : V₀ se déduit de l’ordonnée à l’origine.</div>' +
+      '<div class="input-group"><label>V lu sur la seringue (mL) :</label><input type="range" id="V" min="5" max="25" step="1" value="20" style="width:180px"><b id="Vv"></b><label>θ (°C) :</label><input type="range" id="T" min="0" max="50" step="1" value="20" style="width:120px"><b id="Tv"></b></div>' +
+      '<div class="live-readout"><div class="lbl">CAPTEUR DE PRESSION (kPa)</div><div id="p"></div></div><div class="row"><button class="btn success" id="note">Noter la mesure</button><button class="btn danger" id="clr">Effacer</button></div><div class="tw" style="max-height:180px;overflow:auto"><table><tr><th>V (mL)</th><th>θ (°C)</th><th>p (kPa)</th><th>1000/p (kPa⁻¹)</th></tr><tbody id="tb"></tbody></table></div><canvas id="pv"></canvas><div id="mod" class="small"></div><div class="input-group"><label>V₀ trouvé (mL) :</label><input type="text" id="va" inputmode="decimal" style="width:80px"><button class="btn success" id="chk">Vérifier</button></div><div id="res"></div>';
+    const read = () => Math.round(n * Rg * (S.T + 273.15) / ((S.V + V0) * 1e-6) / 100 + 0.1 * nz() * 1) / 10;
+    function upd() { S.cur = read(); $('#Vv').textContent = S.V + ' mL'; $('#Tv').textContent = S.T + ' °C'; $('#p').textContent = fr(S.cur, 1); }
+    function fit() { const w = S.rows; if (w.length < 3) return null; const m = w.length, mx = w.reduce((a, q) => a + q[0], 0) / m, my = w.reduce((a, q) => a + 1000 / q[2], 0) / m; let a = 0, b = 0; w.forEach((q) => { a += (q[0] - mx) * (1000 / q[2] - my); b += (q[0] - mx) * (q[0] - mx); }); return b ? { a: a / b, b: my - a / b * mx } : null; }
+    function draw() { const w = S.rows, f = fit(), xm = 26, ym = Math.max(1, ...w.map((q) => 1000 / q[2]), f ? f.a * xm + f.b : 0) * 1.1; plot($('#pv'), { x0: 0, x1: xm, y0: 0, y1: ym, xl: 'V (mL) — 1000/p (kPa⁻¹)', p: f ? [[0, f.b], [xm, f.a * xm + f.b]] : [], d: w.map((q) => [q[0], 1000 / q[2]]), h: 230 }); $('#mod').textContent = f ? '1000/p = ' + fr(f.a, 4) + ' × V + ' + fr(f.b, 3) + '   ⇒ V₀ = b / a' : 'Note au moins 3 mesures à même température.'; }
+    $('#V').addEventListener('input', () => { S.V = +$('#V').value; upd(); }); $('#T').addEventListener('input', () => { S.T = +$('#T').value; upd(); });
+    $('#note').addEventListener('click', () => { S.rows.push([S.V, S.T, S.cur]); S.rows.sort((a, b) => a[0] - b[0]); $('#tb').innerHTML = S.rows.map((q) => '<tr><td>' + q[0] + '</td><td>' + q[1] + '</td><td>' + fr(q[2], 1) + '</td><td>' + fr(1000 / q[2], 3) + '</td></tr>').join(''); draw(); });
+    $('#clr').addEventListener('click', () => { S.rows = []; $('#tb').innerHTML = ''; $('#res').innerHTML = ''; draw(); });
+    $('#chk').addEventListener('click', () => { const v = parseFloat($('#va').value.replace(',', '.')); if (isNaN(v)) { $('#res').innerHTML = '<div class="warning-box">Saisis V₀ en mL.</div>'; return; } $('#res').innerHTML = '<div class="result-box"><p class="big">' + (Math.abs(v - V0) < 0.6 ? 'Correct' : 'À revoir') + '</p><p class="small">V₀ réel : ' + fr(V0, 1) + ' mL · n = ' + (n * 1000).toExponential(2).replace('.', ',') + ' mmol · pV = nRT à 20 °C : ' + fr(n * Rg * 293.15, 3) + ' J</p></div>'; });
+    upd(); draw(); const rs = () => draw(); window.addEventListener('resize', rs); return () => window.removeEventListener('resize', rs);
   }}
 };
 
 // INITIALISATION
-if ('serviceWorker' in navigator) window.addEventListener('load', () => navigator.serviceWorker.register('sw.js').catch(() => {}));
+(function () {
+  const bar = (msg, label, fn) => { const d = document.createElement('div'); d.style.cssText = 'position:fixed;left:12px;right:12px;bottom:calc(12px + env(safe-area-inset-bottom));z-index:99;background:#0f2027;color:#fff;padding:12px 16px;border-radius:12px;display:flex;gap:10px;align-items:center;justify-content:space-between;box-shadow:0 6px 20px rgba(0,0,0,.4)'; d.innerHTML = '<span>' + msg + '</span><span style="white-space:nowrap"><button class="btn success" style="margin:0 6px 0 0">' + label + '</button><button class="btn secondary" style="margin:0">✕</button></span>'; const b = d.querySelectorAll('button'); b[0].onclick = () => { d.remove(); fn(); }; b[1].onclick = () => d.remove(); document.body.appendChild(d); };
+  window.addEventListener('beforeinstallprompt', (e) => { e.preventDefault(); bar('📲 Installer l’application (accès hors ligne)', 'Installer', () => e.prompt()); });
+  if ('serviceWorker' in navigator) {
+    let had = !!navigator.serviceWorker.controller;
+    navigator.serviceWorker.addEventListener('controllerchange', () => { if (had) bar('✨ Nouvelle version disponible', 'Recharger', () => location.reload()); had = true; });
+    window.addEventListener('load', () => navigator.serviceWorker.register('sw.js').catch(() => {}));
+  }
+})();
 renderHome();
 </script>
 </body>
