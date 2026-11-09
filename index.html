@@ -201,6 +201,151 @@ function startActivity(id) {
 /* ============================================================
    2. REGISTRE DES ACTIVITÉS
    ============================================================ */
+function etalonnage(container, cfg) {
+  const $ = (s) => container.querySelector(s), spec = cfg.mode === 'spec', sup = '⁰¹²³⁴⁵⁶⁷⁸⁹';
+  const nz = () => (Math.random() + Math.random() + Math.random() - 1.5) / 1.5;
+  const fr = (v, d) => v.toFixed(d).replace('.', ',');
+  const sci = (x, d) => { if (!x) return '0'; const e = Math.floor(Math.log10(Math.abs(x))); if (e >= -2 && e <= 2) return fr(+x.toPrecision(d), Math.max(0, d - 1 - e)); return fr(x / Math.pow(10, e), d - 1) + '×10' + String(e).replace('-', '⁻').replace(/\d/g, (c) => sup[c]); };
+  const tf = (v) => v === 0 ? '0' : Math.abs(v) < 0.01 ? sci(v, 2) : String(+v.toPrecision(3)).replace('.', ',');
+  const num = (sel, d) => { const v = parseFloat($(sel).value.replace(',', '.')); return isNaN(v) ? d : v; };
+  let st = null;
+  const resize = () => { if (st) { draw(); spectrum(); } };
+  window.addEventListener('resize', resize);
+  function plot(cv, o) {
+    const r = window.devicePixelRatio || 1, W = cv.clientWidth || 600, H = 260; cv.width = W * r; cv.height = H * r; cv.style.height = H + 'px';
+    const g = cv.getContext('2d'); g.setTransform(r, 0, 0, r, 0, 0); g.clearRect(0, 0, W, H); g.font = '12px sans-serif'; g.lineWidth = 1;
+    const X = (v) => 62 + (v - o.x0) / (o.x1 - o.x0) * (W - 78), Y = (v) => H - 40 - (v - o.y0) / (o.y1 - o.y0) * (H - 55);
+    for (let i = 0; i <= 5; i++) {
+      const xv = o.x0 + (o.x1 - o.x0) * i / 5, yv = o.y0 + (o.y1 - o.y0) * i / 5; g.strokeStyle = '#d6e4f0'; g.beginPath(); g.moveTo(X(xv), 12); g.lineTo(X(xv), H - 40); g.moveTo(62, Y(yv)); g.lineTo(W - 16, Y(yv)); g.stroke();
+      g.fillStyle = '#555'; g.textAlign = 'center'; g.fillText(tf(xv), X(xv), H - 24); g.textAlign = 'right'; g.fillText(tf(yv), 56, Y(yv) + 4);
+    }
+    g.fillStyle = '#222'; g.textAlign = 'center'; g.fillText(o.xl, W / 2, H - 6); g.save(); g.translate(12, H / 2); g.rotate(-Math.PI / 2); g.fillText(o.yl, 0, 0); g.restore();
+    (o.ser || []).forEach((s) => { g.strokeStyle = g.fillStyle = s.c; g.lineWidth = 2; g.setLineDash(s.dash || []);
+      if (s.line) { g.beginPath(); s.p.forEach((q, i) => g[i ? 'lineTo' : 'moveTo'](X(q[0]), Y(q[1]))); g.stroke(); }
+      if (s.dots) s.p.forEach((q) => { g.beginPath(); g.arc(X(q[0]), Y(q[1]), 4, 0, 7); g.fill(); }); g.setLineDash([]); });
+  }
+  function menu() {
+    st = null;
+    container.innerHTML = '<h3>Choisissez la solution à doser</h3><div class="choices">' + cfg.sols.map((s, i) => '<div class="card" data-i="' + i + '"><div class="icon" style="color:' + (s.col || '#2c5364') + '">●</div><div class="title">' + s.n + '</div></div>').join('') + '</div>';
+    container.querySelectorAll('.card').forEach((c) => c.addEventListener('click', () => work(cfg.sols[+c.dataset.i])));
+  }
+  function work(s) {
+    st = { s, rows: [], blank: !spec, off: (Math.random() < .5 ? -1 : 1) * (0.02 + 0.03 * Math.random()), lam: 550, th: 22, cal: spec, kerr: (Math.random() < .5 ? 0.86 : 1.12) + 0.03 * Math.random(), cu: s.stock * Math.max(...s.vols) / s.vf * (0.3 + 0.55 * Math.random()), scan: false, un: null };
+    const n = s.vols.length;
+    container.innerHTML = '<div class="back-bar"><button class="btn secondary" id="bk">← Solutions</button></div><h3>' + s.n + '</h3>' +
+      '<div class="info-box">Solution mère : ' + sci(s.stock, 3) + ' mol/L. Prépare ' + n + ' fioles jaugées de ' + s.vf + ' mL en choisissant le volume de solution mère prélevé (pipette jaugée). Les volumes proposés sont modifiables.</div>' +
+      (spec ? '<div class="input-group"><label>λ (nm) :</label><input type="range" id="lam" min="400" max="900" step="5" value="550" style="width:200px"><b id="lamv">550</b><button class="btn" id="scan">Tracer le spectre</button><button class="btn" id="blank">Blanc (autozéro)</button></div><canvas id="sp"></canvas>' :
+        '<div class="input-group"><label>Température θ (°C) :</label><input type="text" id="th" inputmode="decimal" value="22"><button class="btn" id="calib">Étalonner la cellule (KCl 0,0100 mol/L)</button></div>') +
+      '<div id="msg"></div><div class="tw"><table><tr><th>Fiole</th><th>V mère (mL)</th><th>C (mol/L)</th><th>' + (spec ? 'A' : 'σ (mS/cm)') + '</th><th>' + (spec ? 'λ (nm)' : 'θ (°C)') + '</th><th></th></tr>' +
+      s.vols.map((v, i) => '<tr><td>' + (i + 1) + '</td><td><input type="text" inputmode="decimal" id="v' + i + '" value="' + v + '" style="width:70px"></td><td id="c' + i + '">—</td><td id="y' + i + '">—</td><td id="x' + i + '">—</td><td><button class="btn success" data-m="' + i + '">Mesurer</button></td></tr>').join('') +
+      '<tr><td>Inconnue</td><td colspan="2">solution à doser</td><td id="yu">—</td><td id="xu">—</td><td><button class="btn success" id="mu">Mesurer</button></td></tr></table></div>' +
+      '<canvas id="cv"></canvas><p id="mod" class="small"></p>' +
+      '<div class="input-group"><label>Valeur mesurée pour l’inconnue :</label><input type="text" id="yin" inputmode="decimal"><button class="btn success" id="calc">Calculer C</button></div><div id="res"></div>';
+    $('#bk').addEventListener('click', menu);
+    container.querySelectorAll('[data-m]').forEach((b) => b.addEventListener('click', () => meas(+b.dataset.m)));
+    $('#mu').addEventListener('click', measU); $('#calc').addEventListener('click', calc);
+    if (spec) {
+      $('#lam').addEventListener('input', () => { if (!st) return; st.lam = +$('#lam').value; $('#lamv').textContent = st.lam; spectrum(); });
+      $('#lam').addEventListener('change', () => { if (!st) return; clear(); note('Longueur d’onde modifiée : les mesures sont à refaire.'); });
+      $('#scan').addEventListener('click', () => { if (!st) return; st.scan = true; spectrum(); });
+      $('#blank').addEventListener('click', () => { if (!st) return; st.blank = true; clear(); note('Blanc réalisé avec la cuve d’eau distillée (ℓ = 1,00 cm).'); });
+    } else $('#calib').addEventListener('click', () => { if (!st) return; st.cal = true; clear(); const th = num('#th', 22); note('Cellule étalonnée : σ de référence du KCl 0,0100 mol/L = ' + fr(1.413 * (1 + 0.0195 * (th - 25)), 3) + ' mS/cm à ' + fr(th, 1) + ' °C.'); });
+    draw(); spectrum();
+  }
+  const note = (t) => { $('#msg').innerHTML = '<div class="info-box">' + t + '</div>'; };
+  function read(c, th) {
+    const s = st.s;
+    if (spec) { const A = s.eps * Math.exp(-Math.pow((st.lam - s.l0) / s.w, 2)) * c; return -Math.log10((Math.pow(10, -A) + 0.005) / 1.005) + (st.blank ? 0 : st.off) + 0.002 * nz(); }
+    return (10 * s.lam * c * (1 + 0.02 * (th - 25)) + 0.003) * (st.cal ? 1 : st.kerr) * (1 + 0.005 * nz());
+  }
+  function clear() { st.rows = []; st.un = null; st.s.vols.forEach((v, i) => { ['c', 'y', 'x'].forEach((p) => { $('#' + p + i).textContent = '—'; }); }); $('#yu').textContent = '—'; $('#xu').textContent = '—'; $('#res').innerHTML = ''; draw(); }
+  function meas(i) {
+    if (!st) return;
+    const s = st.s, V = num('#v' + i, 0);
+    if (!(V > 0 && V <= s.vf)) { $('#msg').innerHTML = '<div class="warning-box">Volume prélevé invalide (0 < V ≤ ' + s.vf + ' mL).</div>'; return; }
+    const th = spec ? 25 : num('#th', 22), c = s.stock * V / s.vf, y = read(s.stock * V * (1 + 0.003 * nz()) / (s.vf * (1 + 0.0015 * nz())), th);
+    st.rows[i] = { c, y };
+    $('#c' + i).textContent = sci(c, 3); $('#y' + i).textContent = fr(y, 3); $('#x' + i).textContent = spec ? st.lam : fr(th, 1); $('#msg').innerHTML = ''; draw();
+  }
+  function measU() { if (!st) return; const th = spec ? 25 : num('#th', 22); st.y = read(st.cu, th); $('#yu').textContent = fr(st.y, 3); $('#xu').textContent = spec ? st.lam : fr(th, 1); }
+  function fit() {
+    const r = st.rows.filter(Boolean); if (r.length < 3) return null;
+    const n = r.length, mx = r.reduce((a, q) => a + q.c, 0) / n, my = r.reduce((a, q) => a + q.y, 0) / n; let sxy = 0, sxx = 0, syy = 0;
+    r.forEach((q) => { sxy += (q.c - mx) * (q.y - my); sxx += (q.c - mx) * (q.c - mx); syy += (q.y - my) * (q.y - my); });
+    const a = sxy / sxx; return { a, b: my - a * mx, r2: sxy * sxy / (sxx * syy), lo: Math.min(...r.map((q) => q.y)), hi: Math.max(...r.map((q) => q.y)) };
+  }
+  function draw() {
+    const cv = $('#cv'); if (!cv || !st) return; const f = fit(), r = st.rows.filter(Boolean);
+    const x1 = Math.max(st.s.stock * Math.max(...st.s.vols) / st.s.vf, ...r.map((q) => q.c), st.un ? st.un.c : 0) * 1.1, y1 = Math.max(0.1, ...r.map((q) => q.y), st.un ? st.un.y : 0) * 1.2;
+    const ser = [{ p: r.map((q) => [q.c, q.y]), dots: 1, c: '#2c5364' }]; if (f) ser.push({ p: [[0, f.b], [x1, f.a * x1 + f.b]], line: 1, c: '#c0392b' });
+    if (st.un) { ser.push({ p: [[st.un.c, 0], [st.un.c, st.un.y], [0, st.un.y]], line: 1, dash: [5, 4], c: '#e67e22' }, { p: [[st.un.c, st.un.y]], dots: 1, c: '#e67e22' }); }
+    plot(cv, { x0: 0, x1, y0: 0, y1, xl: 'C (mol/L)', yl: spec ? 'Absorbance A' : 'σ (mS/cm)', ser });
+    $('#mod').textContent = f ? (spec ? 'A' : 'σ') + ' = ' + sci(f.a, 3) + ' × C ' + (f.b < 0 ? '− ' : '+ ') + fr(Math.abs(f.b), 4) + '   (R² = ' + fr(f.r2, 5) + ')' : 'Mesure au moins 3 solutions étalons pour obtenir la droite d’étalonnage.';
+  }
+  function spectrum() {
+    const cv = $('#sp'); if (!cv || !st) return; const s = st.s, c = s.stock * num('#v2', s.vols[2]) / s.vf, ser = [];
+    if (st.scan) { const p = []; for (let l = 400; l <= 900; l += 5) { const A = s.eps * Math.exp(-Math.pow((l - s.l0) / s.w, 2)) * c; p.push([l, Math.max(0, -Math.log10((Math.pow(10, -A) + 0.005) / 1.005) + 0.002 * nz())]); } ser.push({ p, line: 1, c: '#2c5364' }); }
+    ser.push({ p: [[st.lam, 0], [st.lam, 1.6]], line: 1, dash: [5, 4], c: '#e67e22' });
+    plot(cv, { x0: 400, x1: 900, y0: 0, y1: 1.6, xl: 'λ (nm) — spectre de la fiole 3', yl: 'A', ser });
+  }
+  function calc() {
+    if (!st) return;
+    const y = parseFloat($('#yin').value.replace(',', '.')), f = fit(), R = $('#res');
+    if (isNaN(y)) { R.innerHTML = '<div class="warning-box">Saisis la valeur mesurée pour la solution inconnue (mesure-la d’abord).</div>'; return; }
+    if (y <= 0) { R.innerHTML = '<div class="warning-box">Valeur nulle ou négative : le signal est trop faible (longueur d’onde mal choisie ou solution trop diluée).</div>'; return; }
+    if (!f) { R.innerHTML = '<div class="warning-box">Mesure d’abord au moins 3 solutions étalons.</div>'; return; }
+    const c = (y - f.b) / f.a; st.un = { c, y };
+    R.innerHTML = '<div class="result-box"><p>C = (' + (spec ? 'A' : 'σ') + ' − b) / a</p><p class="big">C ≈ ' + sci(c, 3) + ' mol/L</p></div>' + (y < f.lo * 0.95 || y > f.hi * 1.05 ? '<div class="warning-box">Mesure hors du domaine d’étalonnage : dilue la solution ou refais des étalons plus adaptés.</div>' : '') +
+      '<details class="box"><summary>Voir la valeur attendue</summary>C = ' + sci(st.cu, 3) + ' mol/L · écart : ' + fr(Math.abs(c - st.cu) / st.cu * 100, 1) + ' %</details>';
+    draw();
+  }
+  menu();
+  return function cleanup() { window.removeEventListener('resize', resize); st = null; };
+}
+
+const PH = {
+  fr: (v, d) => v.toFixed(d).replace('.', ','),
+  nz: () => (Math.random() + Math.random() + Math.random() - 1.5) / 1.5,
+  rgb: (l) => { let r = 0, g = 0, b = 0; if (l < 440) { r = (440 - l) / 60; b = 1; } else if (l < 490) { g = (l - 440) / 50; b = 1; } else if (l < 510) { g = 1; b = (510 - l) / 20; } else if (l < 580) { r = (l - 510) / 70; g = 1; } else if (l < 645) { r = 1; g = (645 - l) / 65; } else r = 1; return [r, g, b]; },
+  plot: (cv, o) => {
+    const r = window.devicePixelRatio || 1, W = cv.clientWidth || 600, H = o.h || 220; cv.width = W * r; cv.height = H * r; cv.style.height = H + 'px';
+    const g = cv.getContext('2d'); g.setTransform(r, 0, 0, r, 0, 0); g.clearRect(0, 0, W, H); g.font = '12px sans-serif'; g.lineWidth = 1;
+    const X = (v) => 52 + (v - o.x0) / (o.x1 - o.x0) * (W - 66), Y = (v) => H - 38 - (v - o.y0) / (o.y1 - o.y0) * (H - 52), tf = (v) => String(+v.toPrecision(3)).replace('.', ',');
+    for (let i = 0; i <= 5; i++) { const xv = o.x0 + (o.x1 - o.x0) * i / 5, yv = o.y0 + (o.y1 - o.y0) * i / 5; g.strokeStyle = '#d6e4f0'; g.beginPath(); g.moveTo(X(xv), 10); g.lineTo(X(xv), H - 38); g.moveTo(52, Y(yv)); g.lineTo(W - 14, Y(yv)); g.stroke(); g.fillStyle = '#555'; g.textAlign = 'center'; g.fillText(tf(xv), X(xv), H - 22); g.textAlign = 'right'; g.fillText(tf(yv), 46, Y(yv) + 4); }
+    g.fillStyle = '#222'; g.textAlign = 'center'; g.fillText(o.xl, W / 2, H - 5);
+    g.strokeStyle = '#c0392b'; g.lineWidth = 2; g.beginPath(); o.p.forEach((q, i) => g[i ? 'lineTo' : 'moveTo'](X(q[0]), Y(q[1]))); g.stroke();
+  }
+};
+function lumiere(container, mode) {
+  const dif = mode === 'dif', { fr, rgb, plot } = PH, $ = (s) => container.querySelector(s), W = dif ? 100 : 15;
+  const st = { lam: dif ? 650 : 480 + 10 * Math.round(Math.random() * 20), D: 2, a: dif ? 30 + 5 * Math.round(Math.random() * 17) : 50, b: 0.5, x1: -W / 4, x2: W / 4 };
+  const sinc2 = (u) => { const t = Math.PI * u; return Math.abs(t) < 1e-9 ? 1 : Math.pow(Math.sin(t) / t, 2); };
+  const I = (x) => { const k = x * 1e-3 / (st.lam * 1e-9 * st.D); return dif ? sinc2(st.a * 1e-6 * k) : Math.pow(Math.cos(Math.PI * st.b * 1e-3 * k), 2) * sinc2(0.05e-3 * k); };
+  container.innerHTML = '<div class="info-box">' + (dif ? 'Un laser éclaire une fente de largeur <b>a inconnue</b>. Règle λ et D, place les curseurs sur les deux premières extinctions de part et d’autre de la tache centrale, puis déduis a.' : 'Un laser de <b>longueur d’onde inconnue</b> éclaire deux fentes (fentes de Young). Règle b et D, mesure n interfranges avec les curseurs, puis déduis λ.') + '</div>' +
+    '<div class="input-group">' + (dif ? '<label>λ (nm) :</label><input type="range" id="lam" min="400" max="700" step="10" value="650" style="width:180px"><b id="lamv">650</b>' : '<label>b (mm) :</label><input type="range" id="b" min="0.1" max="1" step="0.05" value="0.5" style="width:150px"><b id="bv">0,50</b>') + '<label>D (m) :</label><input type="range" id="D" min="' + (dif ? 1 : 0.5) + '" max="' + (dif ? 4 : 3) + '" step="0.25" value="2" style="width:150px"><b id="Dv">2,00</b></div>' +
+    '<canvas id="st" style="height:90px;background:#000"></canvas><div class="input-group"><label>Curseur 1 (mm) :</label><input type="range" id="x1" min="' + -W + '" max="' + W + '" step="0.1" value="' + st.x1 + '" style="width:200px"><b id="x1v"></b></div><div class="input-group"><label>Curseur 2 (mm) :</label><input type="range" id="x2" min="' + -W + '" max="' + W + '" step="0.1" value="' + st.x2 + '" style="width:200px"><b id="x2v"></b></div>' +
+    (dif ? '' : '<div class="input-group"><label>Nombre d’interfranges entre les curseurs :</label><input type="text" id="n" inputmode="numeric" value="10" style="width:70px"></div>') + '<canvas id="pl"></canvas><button class="btn success" id="calc">' + (dif ? 'Calculer a' : 'Calculer λ') + '</button><div id="res"></div>';
+  function draw() {
+    const cv = $('#st'), r = window.devicePixelRatio || 1, w = cv.clientWidth || 600, h = 90; cv.width = w * r; cv.height = h * r; const g = cv.getContext('2d'); g.setTransform(r, 0, 0, r, 0, 0);
+    const c = rgb(st.lam), X = (x) => (x + W) / (2 * W) * w;
+    for (let px = 0; px < w; px++) { const v = Math.sqrt(I(-W + 2 * W * px / w)); g.fillStyle = 'rgb(' + c.map((t) => Math.round(255 * t * v)).join(',') + ')'; g.fillRect(px, 0, 1, 62); }
+    g.fillStyle = '#ddd'; g.fillRect(0, 62, w, 28); g.fillStyle = '#222'; g.font = '10px sans-serif'; g.textAlign = 'center'; const step = dif ? 5 : 1;
+    for (let x = -W; x <= W + 1e-9; x += step) { g.fillRect(X(x), 62, 1, x % (step * 2) === 0 ? 10 : 6); if (x % (step * 2) === 0) g.fillText(x, X(x), 84); }
+    g.strokeStyle = '#ffeb3b'; g.lineWidth = 2; [st.x1, st.x2].forEach((x) => { g.beginPath(); g.moveTo(X(x), 0); g.lineTo(X(x), 62); g.stroke(); });
+    $('#x1v').textContent = fr(st.x1, 1) + ' mm'; $('#x2v').textContent = fr(st.x2, 1) + ' mm';
+    const p = []; for (let i = 0; i <= 400; i++) { const x = -W + 2 * W * i / 400; p.push([x, I(x)]); } plot($('#pl'), { x0: -W, x1: W, y0: 0, y1: 1, xl: 'x sur l’écran (mm) — intensité relative', p });
+  }
+  const bind = (id, k, f) => { const e = $('#' + id); if (e) e.addEventListener('input', () => { st[k] = +e.value; f && f(); draw(); }); };
+  bind('lam', 'lam', () => { $('#lamv').textContent = st.lam; }); bind('b', 'b', () => { $('#bv').textContent = fr(st.b, 2); }); bind('D', 'D', () => { $('#Dv').textContent = fr(st.D, 2); }); bind('x1', 'x1'); bind('x2', 'x2');
+  $('#calc').addEventListener('click', () => {
+    const d = Math.abs(st.x2 - st.x1), n = dif ? 1 : Math.max(1, parseInt($('#n').value) || 1), R = $('#res');
+    if (d < 0.2) { R.innerHTML = '<div class="warning-box">Écarte les deux curseurs.</div>'; return; }
+    const v = dif ? 2 * st.lam * st.D / d : 1000 * st.b * (d / n) / st.D, t = dif ? st.a : st.lam;
+    R.innerHTML = '<div class="result-box"><p>' + (dif ? 'L = ' + fr(d, 1) + ' mm ; a = 2λD / L' : 'i = ' + fr(d / n, 2) + ' mm ; λ = b·i / D') + '</p><p class="big">' + (dif ? 'a ≈ ' + fr(v, 1) + ' µm' : 'λ ≈ ' + fr(v, 0) + ' nm') + '</p></div><details class="box"><summary>Voir la valeur attendue</summary>' + (dif ? 'a = ' + t + ' µm' : 'λ = ' + t + ' nm') + ' · écart : ' + fr(Math.abs(v - t) / t * 100, 1) + ' %</details>';
+  });
+  draw(); const rs = () => draw(); window.addEventListener('resize', rs); return () => window.removeEventListener('resize', rs);
+}
+
 const REGISTRY = {
   // --- CHUTE LIBRE ---
   chute: { domain: 'physique', icon: '🪂', render: function(container, lang) {
@@ -267,57 +412,7 @@ const REGISTRY = {
   }},
 
   // --- DIFFRACTION ---
-  diffraction: { domain: 'physique', icon: '💡', render: function(container, lang) {
-    container.innerHTML = `
-      <div class="info-box">Diffraction par une fente. La largeur de la fente influe sur la tache centrale.</div>
-      <div class="sim-layout">
-        <div class="montage-frame"><canvas id="diff-canvas" width="600" height="250"></canvas></div>
-        <div class="controls-panel">
-          <div class="input-group"><label>Largeur fente a (µm) :</label> <input type="range" id="diff-a" min="10" max="100" value="50" step="1" oninput="window.LABOPC_ACTIVE.calc()"></div>
-          <div class="input-group"><label>Longueur d'onde λ (nm) :</label> <input type="range" id="diff-l" min="400" max="700" value="600" step="10" oninput="window.LABOPC_ACTIVE.calc()"></div>
-          <div class="result-box" id="diff-res"></div>
-        </div>
-      </div>
-    `;
-    window.LABOPC_ACTIVE = {
-      calc: () => {
-        const a = parseFloat(document.getElementById('diff-a').value) * 1e-6;
-        const l = parseFloat(document.getElementById('diff-l').value) * 1e-9;
-        const L = (2 * l * 2) / a * 1e3;
-        document.getElementById('diff-res').innerHTML = `Largeur tache ≈ <strong>${L.toFixed(1)} mm</strong>`;
-        
-        const canvas = document.getElementById('diff-canvas'); if (!canvas) return;
-        const ctx = canvas.getContext('2d'); const w = canvas.width, h = canvas.height;
-        ctx.clearRect(0,0,w,h); ctx.fillStyle = '#f8fafc'; ctx.fillRect(0,0,w,h);
-        
-        // Source
-        ctx.fillStyle = '#ffeb3b'; ctx.beginPath(); ctx.arc(50, h/2, 15, 0, 2*Math.PI); ctx.fill();
-        ctx.fillStyle = '#333'; ctx.font = '12px sans-serif'; ctx.fillText('Source', 30, h/2 + 30);
-        
-        // Faisceau
-        ctx.strokeStyle = '#ffeb3b'; ctx.lineWidth = 2; ctx.beginPath(); ctx.moveTo(65, h/2); ctx.lineTo(200, h/2); ctx.stroke();
-        
-        // Fente variable
-        const gap = (parseFloat(document.getElementById('diff-a').value) / 100) * 60;
-        ctx.fillStyle = '#333'; ctx.fillRect(200, 20, 10, h/2 - gap/2 - 20); ctx.fillRect(200, h/2 + gap/2, 10, h/2 - 20);
-        
-        // Écran
-        ctx.fillStyle = '#111'; ctx.fillRect(500, 20, 20, h-40);
-        
-        // Tache centrale nette
-        const width = Math.max(5, 30000 * l / a);
-        const grad = ctx.createLinearGradient(500, 0, 500 + width*2, 0);
-        grad.addColorStop(0, 'rgba(255,255,255,1)'); grad.addColorStop(0.5, 'rgba(255,255,255,1)'); grad.addColorStop(1, 'rgba(255,255,255,0)');
-        ctx.fillStyle = grad;
-        ctx.fillRect(500, h/2 - width, width*2, width*2);
-        ctx.fillStyle = '#fff'; ctx.beginPath(); ctx.arc(510, h/2, 5, 0, 2*Math.PI); ctx.fill();
-      }
-    };
-    window.LABOPC_ACTIVE.calc();
-    return function cleanup() { delete window.LABOPC_ACTIVE; };
-  }},
-
-  // --- LENTILLE ---
+  diffraction: { domain: 'physique', icon: '💡', render: function(container, lang) { return lumiere(container, 'dif'); }},
   lentille: { domain: 'physique', icon: '🔎', render: function(container, lang) {
     container.innerHTML = `
       <div class="info-box">Lentille mince. Modifiez la focale et la distance.</div>
@@ -376,647 +471,226 @@ const REGISTRY = {
 
   // --- VENTURI ---
   venturi: { domain: 'physique', icon: '🌪️', render: function(container, lang) {
-    container.innerHTML = `
-      <div class="info-box">Effet Venturi. La vitesse augmente et la pression diminue dans le rétrécissement.</div>
-      <div class="sim-layout">
-        <div class="montage-frame"><canvas id="vent-canvas" width="500" height="200"></canvas></div>
-        <div class="controls-panel">
-          <div class="input-group"><label>Diamètre large D1 (cm) :</label> <input type="number" id="vent-d1" value="10" step="1" oninput="window.LABOPC_ACTIVE.calc()"></div>
-          <div class="input-group"><label>Diamètre étroit D2 (cm) :</label> <input type="number" id="vent-d2" value="5" step="1" oninput="window.LABOPC_ACTIVE.calc()"></div>
-          <div class="result-box" id="vent-res"></div>
-        </div>
-      </div>
-    `;
-    window.LABOPC_ACTIVE = {
-      calc: () => {
-        const d1 = parseFloat(document.getElementById('vent-d1').value);
-        const d2 = parseFloat(document.getElementById('vent-d2').value);
-        const v1 = 2;
-        const S1 = Math.PI * (d1/2)**2, S2 = Math.PI * (d2/2)**2;
-        const v2 = v1 * (S1/S2);
-        
-        document.getElementById('vent-res').innerHTML = `Vitesse v2 = <strong>${v2.toFixed(1)} m/s</strong>`;
-        
-        const canvas = document.getElementById('vent-canvas'); if (!canvas) return;
-        const ctx = canvas.getContext('2d'); const w = canvas.width, h = canvas.height;
-        ctx.clearRect(0,0,w,h); ctx.fillStyle = '#f8fafc'; ctx.fillRect(0,0,w,h);
-        
-        // Tube
-        ctx.fillStyle = '#b3e5fc'; ctx.beginPath();
-        ctx.moveTo(0, 50); ctx.lineTo(w/2 - 50, 50); ctx.lineTo(w/2, 80); ctx.lineTo(w/2 + 50, 50); ctx.lineTo(w, 50);
-        ctx.lineTo(w, 150); ctx.lineTo(w/2 + 50, 150); ctx.lineTo(w/2, 120); ctx.lineTo(w/2 - 50, 150); ctx.lineTo(0, 150);
-        ctx.fill();
-
-        // Vecteurs vitesse
-        ctx.strokeStyle = '#e74c3c'; ctx.lineWidth = 3;
-        // v1 (petit)
-        ctx.beginPath(); ctx.moveTo(50, 100); ctx.lineTo(50 + v1*10, 100); ctx.stroke();
-        ctx.beginPath(); ctx.moveTo(50 + v1*10, 100); ctx.lineTo(50 + v1*10 - 5, 95); ctx.lineTo(50 + v1*10 - 5, 105); ctx.fill();
-        // v2 (grand)
-        ctx.beginPath(); ctx.moveTo(w/2 - 20, 100); ctx.lineTo(w/2 - 20 + v2*10, 100); ctx.stroke();
-        ctx.beginPath(); ctx.moveTo(w/2 - 20 + v2*10, 100); ctx.lineTo(w/2 - 20 + v2*10 - 5, 95); ctx.lineTo(w/2 - 20 + v2*10 - 5, 105); ctx.fill();
-      }
-    };
-    window.LABOPC_ACTIVE.calc();
-    return function cleanup() { delete window.LABOPC_ACTIVE; };
+    const { fr, nz } = PH, $ = (s) => container.querySelector(s), g = 9.81, rho = 998, P1 = 12000, S = { D1: 10, D2: 5, Q: 300, hid: null };
+    container.innerHTML = '<div class="info-box">Tube de Venturi horizontal rempli d’eau (ρ = 998 kg/m³ à 20 °C), pression relative en amont P₁ = 12 kPa. Règle D₁, D₂ et le débit Q : les tubes piézométriques donnent les pressions. Avec « Débit inconnu », déduis Q de la différence de hauteur Δh.</div>' +
+      '<div class="input-group"><label>D₁ (cm) :</label><input type="range" id="d1" min="4" max="10" step="0.5" value="10" style="width:120px"><b id="d1v"></b><label>D₂ (cm) :</label><input type="range" id="d2" min="1" max="9" step="0.5" value="5" style="width:120px"><b id="d2v"></b><label>Q (L/min) :</label><input type="range" id="q" min="5" max="600" step="5" value="300" style="width:140px"><b id="qv"></b></div>' +
+      '<div class="row"><button class="btn" id="hid">Débit inconnu</button><button class="btn secondary" id="free">Mode libre</button></div><div id="svg"></div><div id="out" class="result-box"></div><div class="input-group" id="ans" style="display:none"><label>Q trouvé (L/min) :</label><input type="text" id="qa" inputmode="decimal" style="width:90px"><button class="btn success" id="chk">Vérifier</button></div><div id="res"></div>';
+    function upd() {
+      const D1 = S.D1, D2 = Math.min(S.D2, D1 - 0.5), S1 = Math.PI * Math.pow(D1 / 200, 2), S2 = Math.PI * Math.pow(D2 / 200, 2), Q = (S.hid == null ? S.Q : S.hid) / 60000;
+      const v1 = Q / S1, v2 = Q / S2, dP = 0.5 * rho * (v2 * v2 - v1 * v1), P2 = P1 - dP, h1 = P1 / (rho * g) * 100, h2 = P2 / (rho * g) * 100, cav = 101325 + P2 < 2339;
+      $('#d1v').textContent = fr(D1, 1); $('#d2v').textContent = fr(D2, 1); $('#qv').textContent = S.hid == null ? S.Q : '?';
+      const c = 150, a1 = D1 * 4.5, a2 = D2 * 4.5, px = (h) => Math.max(0, Math.min(150, h * 0.6));
+      $('#svg').innerHTML = '<svg viewBox="0 0 560 300" style="width:100%;max-width:640px"><path d="M20 ' + (c - a1) + ' L200 ' + (c - a1) + ' L260 ' + (c - a2) + ' L340 ' + (c - a2) + ' L400 ' + (c - a1) + ' L540 ' + (c - a1) + ' L540 ' + (c + a1) + ' L400 ' + (c + a1) + ' L340 ' + (c + a2) + ' L260 ' + (c + a2) + ' L200 ' + (c + a1) + ' L20 ' + (c + a1) + 'Z" fill="#b3e5fc" stroke="#546e7a" stroke-width="3"/>' +
+        '<rect x="105" y="' + (c - a1 - px(h1)) + '" width="10" height="' + px(h1) + '" fill="#4fc3f7"/><rect x="295" y="' + (c - a2 - px(h2)) + '" width="10" height="' + px(h2) + '" fill="#4fc3f7"/><rect x="103" y="' + (c - a1 - 150) + '" width="14" height="150" fill="none" stroke="#546e7a"/><rect x="293" y="' + (c - a2 - 150) + '" width="14" height="150" fill="none" stroke="#546e7a"/>' +
+        '<text x="110" y="' + (c - a1 - 156) + '" text-anchor="middle" font-size="12">h₁</text><text x="300" y="' + (c - a2 - 156) + '" text-anchor="middle" font-size="12">h₂</text><text x="60" y="' + (c + 4) + '" font-size="13" fill="#0d47a1">→ Q</text></svg>';
+      const n = S.hid == null ? 0 : 0.1 * nz();
+      $('#out').innerHTML = S.hid == null ? 'v₁ = ' + fr(v1, 2) + ' m/s · v₂ = ' + fr(v2, 2) + ' m/s · ΔP = ' + fr(dP, 0) + ' Pa<br>h₁ = ' + fr(h1, 1) + ' cm · h₂ = ' + fr(h2, 1) + ' cm · Δh = ' + fr(h1 - h2, 1) + ' cm' + (h2 < 0 ? '<br><b>Dépression : le niveau h₂ est sous l’axe du tube.</b>' : '') + (cav ? '<br><b>Cavitation : P₂ absolue inférieure à la pression de vapeur saturante.</b>' : '') : 'h₁ = ' + fr(h1 + n, 1) + ' cm · h₂ = ' + fr(h2 + n, 1) + ' cm · Δh = ' + fr(h1 - h2 + 2 * n, 1) + ' cm (lecture à ±0,1 cm), D₁ = ' + fr(D1, 1) + ' cm, D₂ = ' + fr(D2, 1) + ' cm';
+      $('#ans').style.display = S.hid == null ? 'none' : ''; S.cur = { S1, S2, dh: (h1 - h2) / 100 + 2 * n / 100, Q: Q * 60000 };
+    }
+    [['d1', 'D1'], ['d2', 'D2'], ['q', 'Q']].forEach(([i, k]) => $('#' + i).addEventListener('input', () => { S[k] = +$('#' + i).value; upd(); }));
+    $('#hid').addEventListener('click', () => { S.hid = 40 + Math.round(Math.random() * 100) * 4; $('#res').innerHTML = ''; upd(); }); $('#free').addEventListener('click', () => { S.hid = null; $('#res').innerHTML = ''; upd(); });
+    $('#chk').addEventListener('click', () => { const q = parseFloat($('#qa').value.replace(',', '.')), c = S.cur, e = Math.sqrt(2 * g * Math.max(0, c.dh) / (Math.pow(c.S1 / c.S2, 2) - 1)) * c.S1 * 60000; if (!(q > 0)) { $('#res').innerHTML = '<div class="warning-box">Saisis ton débit en L/min.</div>'; return; } $('#res').innerHTML = '<div class="result-box"><p>Q = S₁·√(2gΔh / ((S₁/S₂)² − 1))</p><p class="big">' + (Math.abs(q - c.Q) / c.Q < 0.05 ? 'Correct' : 'À revoir') + '</p><p class="small">Débit réel : ' + fr(c.Q, 0) + ' L/min · ton écart : ' + fr(Math.abs(q - c.Q) / c.Q * 100, 1) + ' %</p></div>'; });
+    upd(); return () => {};
   }},
-
-  // --- ARCHIMÈDE ---
   archimede: { domain: 'physique', icon: '🛟', render: function(container, lang) {
-    container.innerHTML = `
-      <div class="info-box">Poussée d'Archimède. <strong>Formule :</strong> P_archi = ρ_fluide × V_immergé × g</div>
-      <div class="sim-layout">
-        <div class="montage-frame"><canvas id="arch-canvas" width="300" height="350"></canvas></div>
-        <div class="controls-panel">
-          <div class="input-group">
-            <label>Matière :</label>
-            <select id="arch-mat" onchange="window.LABOPC_ACTIVE.calc()" style="padding:8px; border-radius:8px;">
-              <option value="800">Bois (800 kg/m³)</option>
-              <option value="917">Glace (917 kg/m³)</option>
-              <option value="2700">Aluminium (2700 kg/m³)</option>
-              <option value="7800">Fer (7800 kg/m³)</option>
-            </select>
-          </div>
-          <div class="input-group"><label>Volume objet V (L) :</label> <input type="number" id="arch-v" value="10" step="1" oninput="window.LABOPC_ACTIVE.calc()"></div>
-          <div id="arch-steps"></div>
-        </div>
-      </div>
-    `;
-    window.LABOPC_ACTIVE = {
-      calc: () => {
-        const rho_obj = parseFloat(document.getElementById('arch-mat').value);
-        const V = parseFloat(document.getElementById('arch-v').value) / 1000;
-        const rho_fluide = 1000;
-        const g = 9.81;
-        const m = rho_obj * V;
-        const P = m * g;
-        const Pa = rho_fluide * V * g;
-        const res = P > Pa ? "Coule" : "Flotte";
-        
-        document.getElementById('arch-steps').innerHTML = `
-          <div class="steps-container">
-            <h3>🧮 Caractéristiques des forces</h3>
-            <div class="step-item"><div class="step-number">1</div><div class="step-body"><div class="step-title">Poids (P)</div><div class="step-calc">P = m × g = ${m.toFixed(1)} × 9.81 = ${P.toFixed(1)} N<br>Direction : verticale, Sens : vers le bas</div></div></div>
-            <div class="step-item"><div class="step-number">2</div><div class="step-body"><div class="step-title">Poussée d'Archimède (Pa)</div><div class="step-calc">Pa = ρ × V × g = 1000 × ${V} × 9.81 = ${Pa.toFixed(1)} N<br>Direction : verticale, Sens : vers le haut</div></div></div>
-            <div class="result-box"><p class="big">${res}</p></div>
-          </div>
-        `;
-
-        const canvas = document.getElementById('arch-canvas'); if (!canvas) return;
-        const ctx = canvas.getContext('2d'); const w = canvas.width, h = canvas.height;
-        ctx.clearRect(0,0,w,h);
-        
-        // Bécher
-        ctx.fillStyle = '#f0f4f8'; ctx.fillRect(50, 50, 200, 250);
-        ctx.fillStyle = '#b3e5fc'; ctx.fillRect(50, 120, 200, 180);
-        
-        // Objet
-        const objY = res === "Flotte" ? 180 : 280;
-        ctx.fillStyle = '#546e7a'; ctx.fillRect(110, objY - 40, 80, 80);
-        
-        // Vecteurs (segments fléchés)
-        // Poids (vers le bas)
-        ctx.strokeStyle = '#e74c3c'; ctx.lineWidth = 4;
-        ctx.beginPath(); ctx.moveTo(150, objY); ctx.lineTo(150, objY + 60); ctx.stroke();
-        ctx.beginPath(); ctx.moveTo(140, objY + 50); ctx.lineTo(160, objY + 50); ctx.lineTo(150, objY + 65); ctx.fill();
-        ctx.fillStyle = '#e74c3c'; ctx.font = '14px sans-serif'; ctx.fillText('P', 160, objY + 40);
-
-        // Poussée (vers le haut)
-        ctx.strokeStyle = '#11998e';
-        ctx.beginPath(); ctx.moveTo(150, objY); ctx.lineTo(150, objY - 60); ctx.stroke();
-        ctx.beginPath(); ctx.moveTo(140, objY - 50); ctx.lineTo(160, objY - 50); ctx.lineTo(150, objY - 65); ctx.fill();
-        ctx.fillStyle = '#11998e'; ctx.fillText('Pa', 160, objY - 40);
-      }
-    };
-    window.LABOPC_ACTIVE.calc();
-    return function cleanup() { delete window.LABOPC_ACTIVE; };
+    const { fr, nz } = PH, $ = (s) => container.querySelector(s), g = 9.81;
+    const MAT = [['Glace', 917, '#cfe8f6'], ['Chêne (≈)', 750, '#8d6e63'], ['Liège (≈)', 240, '#d7b98e'], ['Verre (≈)', 2500, '#a5d6c7'], ['Aluminium', 2700, '#b0bec5'], ['Fer', 7870, '#607d8b'], ['Cuivre', 8960, '#c77d4a']];
+    const FLU = [['Eau douce (20 °C)', 998, '#4fc3f7'], ['Eau de mer (≈)', 1025, '#29b6f6'], ['Huile d’olive (≈)', 915, '#f6e05e'], ['Éthanol', 789, '#e1f5fe'], ['Glycérol (≈)', 1260, '#fff3cd'], ['Mercure', 13546, '#9e9e9e']];
+    const S = { mi: 4, fi: 0, V: 500, s: 0, hid: 0 };
+    container.innerHTML = '<div class="info-box">Un objet est suspendu à un dynamomètre. Immerge-le progressivement : P_app = P − Π. Avec « fluide inconnu », mesure P (dans l’air) et P_app, puis déduis la masse volumique du fluide. Masses volumiques indicatives (g = 9,81 N/kg).</div>' +
+      '<div class="input-group"><label>Matériau :</label><select id="mat">' + MAT.map((m, i) => '<option value="' + i + '"' + (i === 4 ? ' selected' : '') + '>' + m[0] + '</option>').join('') + '</select><label>Fluide :</label><select id="flu">' + FLU.map((m, i) => '<option value="' + i + '">' + m[0] + '</option>').join('') + '<option value="9">❓ Fluide inconnu</option></select></div>' +
+      '<div class="input-group"><label>Volume (cm³) :</label><input type="range" id="V" min="100" max="10000" step="100" value="500" style="width:160px"><b id="Vv"></b><label>Immersion :</label><input type="range" id="s" min="0" max="100" step="5" value="0" style="width:140px"><b id="sv"></b></div><div id="svg"></div><div id="out" class="result-box"></div><div class="input-group" id="ans" style="display:none"><label>ρ du fluide (kg/m³) :</label><input type="text" id="ra" inputmode="decimal" style="width:90px"><button class="btn success" id="chk">Vérifier</button></div><div id="res"></div>';
+    function upd() {
+      const unk = S.fi === 9, f = FLU[unk ? S.hid : S.fi], ro = MAT[S.mi][1], rf = f[1], V = S.V * 1e-6, s = S.s / 100, feq = Math.min(1, ro / rf), free = ro < rf && s > feq, se = free ? feq : s;
+      const P = ro * V * g, Pi = rf * V * se * g, rd = Math.max(0, (free ? 0 : P - Pi) + 0.005 * nz()), yb = 190 + 60 * se, yt = yb - 60;
+      $('#Vv').textContent = S.V + ' cm³'; $('#sv').textContent = S.s + ' %';
+      $('#svg').innerHTML = '<svg viewBox="0 0 360 320" style="width:100%;max-width:340px"><rect x="150" y="6" width="60" height="70" rx="6" fill="#455a64"/><text x="180" y="48" text-anchor="middle" fill="#6ee7b7" font-size="17" font-family="monospace">' + fr(rd, 2) + ' N</text><line x1="180" y1="76" x2="180" y2="' + yt + '" stroke="#555" stroke-width="2"/>' +
+        '<rect x="92" y="190" width="176" height="108" fill="' + f[2] + '" opacity=".55"/><rect x="150" y="' + yt + '" width="60" height="60" fill="' + MAT[S.mi][2] + '" stroke="#333"/><path d="M90 160 L90 290 Q90 300 100 300 L260 300 Q270 300 270 290 L270 160" fill="none" stroke="#7a8fa3" stroke-width="3"/></svg>';
+      $('#out').innerHTML = 'Lecture du dynamomètre : <b>' + fr(rd, 2) + ' N</b>' + (free ? '<br>L’objet flotte librement : fraction immergée ≈ ' + fr(feq * 100, 0) + ' % (ρ_objet / ρ_fluide).' : '') + (unk ? '' : '<br>Prévision : Π = ρ_fluide·V_immergé·g = ' + fr(Pi, 2) + ' N · P = ' + fr(P, 2) + ' N' + (ro > rf && s === 1 ? ' · l’objet coule (ρ_objet > ρ_fluide)' : ''));
+      $('#ans').style.display = unk ? '' : 'none';
+    }
+    $('#mat').addEventListener('change', () => { S.mi = +$('#mat').value; upd(); }); $('#flu').addEventListener('change', () => { S.fi = +$('#flu').value; S.hid = Math.floor(Math.random() * FLU.length); $('#res').innerHTML = ''; upd(); });
+    $('#V').addEventListener('input', () => { S.V = +$('#V').value; upd(); }); $('#s').addEventListener('input', () => { S.s = +$('#s').value; upd(); });
+    $('#chk').addEventListener('click', () => { const r = parseFloat($('#ra').value.replace(',', '.')), t = FLU[S.hid][1]; if (!(r > 0)) { $('#res').innerHTML = '<div class="warning-box">Saisis la masse volumique trouvée.</div>'; return; } $('#res').innerHTML = '<div class="result-box"><p>ρ_fluide = Π / (V_immergé · g)</p><p class="big">' + (Math.abs(r - t) / t < 0.05 ? 'Correct' : 'À revoir') + '</p><p class="small">Fluide : ' + FLU[S.hid][0] + ' (' + t + ' kg/m³) · écart : ' + fr(Math.abs(r - t) / t * 100, 1) + ' %</p></div>'; });
+    upd(); return () => {};
   }},
-
-  // --- INTERFÉRENCES ---
-  interferences: { domain: 'physique', icon: '🎛️', render: function(container, lang) {
-    container.innerHTML = `
-      <div class="info-box">Interférences (Young). Franges brillantes (claires) et sombres (foncées).</div>
-      <div class="sim-layout">
-        <div class="montage-frame"><canvas id="interf-canvas" width="600" height="250"></canvas></div>
-        <div class="controls-panel">
-          <div class="input-group"><label>Distance fentes b (mm) :</label> <input type="range" id="interf-b" min="0.1" max="1.0" value="0.5" step="0.05" oninput="window.LABOPC_ACTIVE.calc()"></div>
-          <div id="interf-steps"></div>
-        </div>
-      </div>
-    `;
-    window.LABOPC_ACTIVE = {
-      calc: () => {
-        const b = parseFloat(document.getElementById('interf-b').value) * 1e-3;
-        const l = 600e-9, D = 1.0;
-        const i = (l * D) / b * 1e3;
-        document.getElementById('interf-steps').innerHTML = `<div class="result-box">Interfrange i = <strong>${i.toFixed(2)} mm</strong></div>`;
-        
-        const canvas = document.getElementById('interf-canvas'); if (!canvas) return;
-        const ctx = canvas.getContext('2d'); const w = canvas.width, h = canvas.height;
-        ctx.clearRect(0,0,w,h); ctx.fillStyle = '#f8fafc'; ctx.fillRect(0,0,w,h);
-        
-        // Source
-        ctx.fillStyle = '#ffeb3b'; ctx.beginPath(); ctx.arc(50, h/2, 15, 0, 2*Math.PI); ctx.fill();
-        
-        // Fentes (largeur variable)
-        const gap = parseFloat(document.getElementById('interf-b').value) * 40;
-        ctx.fillStyle = '#333'; ctx.fillRect(200, 20, 10, h/2 - gap/2 - 20); ctx.fillRect(200, h/2 + gap/2, 10, h/2 - 20);
-        
-        // Écran avec franges
-        ctx.fillStyle = '#111'; ctx.fillRect(500, 20, 30, h-40);
-        const step = Math.max(10, i * 50);
-        for(let y = 20; y < h-20; y += step) {
-          ctx.fillStyle = '#fff'; ctx.fillRect(500, y, 30, step/2);
-        }
-      }
-    };
-    window.LABOPC_ACTIVE.calc();
-    return function cleanup() { delete window.LABOPC_ACTIVE; };
-  }},
-
-  // --- DOPPLER ---
+  interferences: { domain: 'physique', icon: '🎛️', render: function(container, lang) { return lumiere(container, 'int'); }},
   doppler: { domain: 'physique', icon: '🚑', render: function(container, lang) {
-    container.innerHTML = `
-      <div class="info-box">Effet Doppler. Comparez l'approche et l'éloignement.</div>
-      <div class="sim-layout">
-        <div class="montage-frame"><canvas id="dop-canvas" width="500" height="200"></canvas></div>
-        <div class="controls-panel">
-          <div class="input-group"><label>Vitesse source (m/s) :</label> <input type="range" id="dop-v" min="-30" max="30" value="10" step="1" oninput="window.LABOPC_ACTIVE.calc()"></div>
-          <div class="result-box" id="dop-res"></div>
-        </div>
-      </div>
-    `;
-    window.LABOPC_ACTIVE = {
-      calc: () => {
-        const v = parseFloat(document.getElementById('dop-v').value);
-        const c = 340, f0 = 440;
-        const f = f0 * (c / (c + v));
-        const delta_f = Math.abs(f0 - f);
-        
-        let state = v > 0 ? "s'éloigne (fréquence plus basse)" : v < 0 ? "s'approche (fréquence plus haute)" : "est immobile";
-        document.getElementById('dop-res').innerHTML = `La source ${state}.<br>Fréquence perçue : <strong>${f.toFixed(0)} Hz</strong> (Δf = ${delta_f.toFixed(0)} Hz)`;
-        
-        const canvas = document.getElementById('dop-canvas'); if (!canvas) return;
-        const ctx = canvas.getContext('2d'); const w = canvas.width, h = canvas.height;
-        ctx.clearRect(0,0,w,h); ctx.fillStyle = '#f8fafc'; ctx.fillRect(0,0,w,h);
-        
-        // Récepteur
-        ctx.fillStyle = '#546e7a'; ctx.beginPath(); ctx.arc(450, h/2, 15, 0, 2*Math.PI); ctx.fill();
-        
-        // Source
-        const srcX = 100;
-        ctx.fillStyle = '#e74c3c'; ctx.beginPath(); ctx.arc(srcX, h/2, 15, 0, 2*Math.PI); ctx.fill();
-        
-        // Ondes (resserrées si approche, espacées si éloignement)
-        ctx.strokeStyle = '#2c5364'; ctx.lineWidth = 1;
-        const spacing = v > 0 ? 30 : (v < 0 ? 10 : 20);
-        for(let r = 20; r < 150; r += spacing) {
-          ctx.beginPath(); ctx.arc(srcX, h/2, r, 0, 2*Math.PI); ctx.stroke();
-        }
-      }
-    };
-    window.LABOPC_ACTIVE.calc();
-    return function cleanup() { delete window.LABOPC_ACTIVE; };
+    const { fr, nz } = PH, $ = (s) => container.querySelector(s), S = { f0: 440, v: 30, th: 20, vh: null, fh: 0, t: 0, last: 0, src: 90, fronts: [], raf: 0, tm: 0 }, cpx = 110;
+    container.innerHTML = '<div class="info-box">Une source sonore se déplace vers la droite. Observateur à droite (devant) et à gauche (derrière). c = 331,3 + 0,606·θ. Les fronts d’onde sont émis régulièrement ; leur espacement montre l’effet Doppler.</div>' +
+      '<div class="input-group"><label>f₀ (Hz) :</label><input type="range" id="f0" min="200" max="1000" step="10" value="440" style="width:130px"><b id="f0v"></b><label>v (m/s) :</label><input type="range" id="v" min="0" max="120" step="1" value="30" style="width:130px"><b id="vv"></b><label>θ (°C) :</label><input type="range" id="th" min="0" max="40" step="1" value="20" style="width:110px"><b id="thv"></b></div>' +
+      '<div class="row"><button class="btn" id="pb">Problème : vitesse inconnue</button><button class="btn secondary" id="free">Mode libre</button></div><canvas id="cv" style="height:200px"></canvas><div id="out" class="result-box"></div><div class="input-group" id="ans" style="display:none"><label>v trouvée (m/s) :</label><input type="text" id="va" inputmode="decimal" style="width:90px"><button class="btn success" id="chk">Vérifier</button></div><div id="res"></div>';
+    const cc = () => 331.3 + 0.606 * S.th;
+    function txt() {
+      const c = cc(), v = S.vh == null ? S.v : S.vh; $('#f0v').textContent = S.f0; $('#vv').textContent = S.vh == null ? S.v : '?'; $('#thv').textContent = S.th;
+      $('#out').innerHTML = S.vh == null ? 'c = ' + fr(c, 1) + ' m/s<br>Devant : f′ = f₀·c/(c − v) = <b>' + fr(S.f0 * c / (c - v), 1) + ' Hz</b> · derrière : f′ = f₀·c/(c + v) = <b>' + fr(S.f0 * c / (c + v), 1) + ' Hz</b>' : 'c = ' + fr(c, 1) + ' m/s · f₀ = ' + S.f0 + ' Hz<br>Fréquence perçue par l’observateur devant la source : <b>' + fr(S.fh, 1) + ' Hz</b>';
+      $('#ans').style.display = S.vh == null ? 'none' : '';
+    }
+    function frame(ts) {
+      const cv = $('#cv'); if (!cv) return; const dt = Math.min(0.05, S.tm ? (ts - S.tm) / 1000 : 0); S.tm = ts;
+      const c = cc(), v = S.vh == null ? S.v : S.vh, vpx = cpx * v / c, r = window.devicePixelRatio || 1, W = cv.clientWidth || 600, H = 200; cv.width = W * r; cv.height = H * r;
+      S.t += dt; S.src += vpx * dt; if (S.t - S.last >= 0.7) { S.fronts.push({ x: S.src, t: S.t }); S.last = S.t; } if (S.src > W - 90) { S.src = 90; S.fronts = []; }
+      const g = cv.getContext('2d'); g.setTransform(r, 0, 0, r, 0, 0); g.strokeStyle = '#2c5364'; g.lineWidth = 1.5;
+      S.fronts.forEach((f) => { g.beginPath(); g.arc(f.x, H / 2, cpx * (S.t - f.t), 0, 7); g.stroke(); });
+      g.fillStyle = '#e74c3c'; g.beginPath(); g.arc(S.src, H / 2, 9, 0, 7); g.fill(); g.fillStyle = '#222'; g.font = '12px sans-serif'; g.textAlign = 'center';
+      [[30, 'derrière'], [W - 30, 'devant']].forEach(([x, l]) => { g.fillStyle = '#11998e'; g.beginPath(); g.arc(x, H / 2, 8, 0, 7); g.fill(); g.fillStyle = '#222'; g.fillText(l, x, H / 2 + 26); });
+      S.raf = requestAnimationFrame(frame);
+    }
+    [['f0', 'f0'], ['v', 'v'], ['th', 'th']].forEach(([i, k]) => $('#' + i).addEventListener('input', () => { S[k] = +$('#' + i).value; if (S.vh != null) { S.fh = S.f0 * cc() / (cc() - S.vh) + 0.5 * nz(); } txt(); }));
+    $('#pb').addEventListener('click', () => { S.vh = 10 + Math.floor(Math.random() * 91); S.fh = S.f0 * cc() / (cc() - S.vh) + 0.5 * nz(); S.fronts = []; $('#res').innerHTML = ''; txt(); });
+    $('#free').addEventListener('click', () => { S.vh = null; S.fronts = []; $('#res').innerHTML = ''; txt(); });
+    $('#chk').addEventListener('click', () => { const v = parseFloat($('#va').value.replace(',', '.')); if (!(v > 0)) { $('#res').innerHTML = '<div class="warning-box">Saisis la vitesse trouvée (m/s).</div>'; return; } $('#res').innerHTML = '<div class="result-box"><p>v = c·(1 − f₀/f′)</p><p class="big">' + (Math.abs(v - S.vh) / S.vh < 0.05 ? 'Correct' : 'À revoir') + '</p><p class="small">Vitesse réelle : ' + S.vh + ' m/s · écart : ' + fr(Math.abs(v - S.vh) / S.vh * 100, 1) + ' %</p></div>'; });
+    txt(); S.raf = requestAnimationFrame(frame); return () => cancelAnimationFrame(S.raf);
   }},
-
-  // --- SPECTROPHOTOMÉTRIE ---
   spectro: { domain: 'chimie', icon: '🌈', render: function(container, lang) {
-    const SOLS = {
-      permanganate: { name: "KMnO₄", color: "#7b1fa2", lambda: 530, kTrue: 2.3, unit: "mmol/L", conc: [0, 0.1, 0.2, 0.3, 0.4, 0.5], unk: 0.27 },
-      cuivre: { name: "CuSO₄", color: "#1565c0", lambda: 800, kTrue: 0.0125, unit: "mmol/L", conc: [0, 20, 40, 60, 80, 100], unk: 55 }
-    };
-    let currentSol = null, measured = {}, unkMeasured = null;
-    
-    function draw() {
-      const canvas = document.getElementById('spectro-canvas'); if(!canvas) return;
-      const sol = SOLS[currentSol]; const ctx = canvas.getContext('2d');
-      const W = canvas.width = 600, H = canvas.height = 300;
-      const padL = 60, padB = 40, padT = 20, padR = 20;
-      const plotW = W-padL-padR, plotH = H-padT-padB;
-      ctx.clearRect(0,0,W,H); ctx.fillStyle = '#fff'; ctx.fillRect(0,0,W,H);
-      
-      ctx.strokeStyle = '#eee'; ctx.lineWidth = 1;
-      for(let i=0; i<=5; i++) { ctx.beginPath(); ctx.moveTo(padL, padT+i*plotH/5); ctx.lineTo(W-padR, padT+i*plotH/5); ctx.stroke(); }
-      ctx.beginPath(); ctx.moveTo(padL, H-padB); ctx.lineTo(W-padR, H-padB); ctx.moveTo(padL, H-padB); ctx.lineTo(padL, padT); ctx.strokeStyle = '#333'; ctx.lineWidth = 2; ctx.stroke();
-      
-      ctx.fillStyle = '#444'; ctx.font = '12px Segoe UI'; ctx.textAlign = 'center';
-      ctx.fillText(`C (${sol.unit})`, W/2, H-10);
-      ctx.save(); ctx.translate(15, H/2); ctx.rotate(-Math.PI/2); ctx.fillText('Absorbance', 0, 0); ctx.restore();
-      
-      // Tracé de la droite théorique (rouge)
-      ctx.strokeStyle = '#e63946'; ctx.lineWidth = 2;
-      ctx.beginPath();
-      const maxC = sol.conc[sol.conc.length-1];
-      const maxA = sol.kTrue * maxC;
-      ctx.moveTo(padL, H - padB);
-      ctx.lineTo(padL + plotW, H - padB - (maxA/2.5)*plotH);
-      ctx.stroke();
-
-      // Points mesurés
-      ctx.fillStyle = '#2c5364';
-      Object.keys(measured).forEach(k => {
-        const c = sol.conc[k]; const a = measured[k];
-        const x = padL + (c/maxC)*plotW;
-        const y = H - padB - (a/2.5)*plotH;
-        ctx.beginPath(); ctx.arc(x, y, 5, 0, 2*Math.PI); ctx.fill();
-      });
-      if (unkMeasured) {
-        const x = padL + (sol.unk/maxC)*plotW;
-        const y = H - padB - (unkMeasured/2.5)*plotH;
-        ctx.fillStyle = '#e65100'; ctx.beginPath(); ctx.arc(x, y, 7, 0, 2*Math.PI); ctx.fill();
-      }
-    }
-    
-    function update() {
-      const sol = SOLS[currentSol];
-      let table = `<table><tr><th>C (${sol.unit})</th><th>Absorbance</th></tr>`;
-      sol.conc.forEach((c, i) => { table += `<tr><td>${c}</td><td>${measured[i] !== undefined ? measured[i].toFixed(3) : '—'}</td></tr>`; });
-      table += `<tr style="background:#fff3e0;"><td>Inconnue</td><td>${unkMeasured ? unkMeasured.toFixed(3) : '—'}</td></tr></table>`;
-      document.getElementById('spec-table').innerHTML = table;
-      draw();
-    }
-    
-    function measure(idx) {
-      const sol = SOLS[currentSol];
-      const trueA = idx === -1 ? (sol.kTrue * sol.unk) : (sol.kTrue * sol.conc[idx]);
-      const noise = idx === 0 ? 0 : (Math.random() - 0.5) * 0.02 * trueA;
-      const val = Math.max(0, trueA + noise);
-      if (idx === -1) unkMeasured = val; else measured[idx] = val;
-      update();
-    }
-    
-    container.innerHTML = `
-      <div class="info-box">Choisissez une solution, mesurez les étalons (dont le blanc), puis l'inconnue.</div>
-      <div class="choices">
-        <div class="card" onclick="window.LABOPC_ACTIVE.selectSol('permanganate')"><div class="title">KMnO₄ (530 nm)</div></div>
-        <div class="card" onclick="window.LABOPC_ACTIVE.selectSol('cuivre')"><div class="title">CuSO₄ (800 nm)</div></div>
-      </div>
-      <div id="spec-area"></div>
-    `;
-    
-    window.LABOPC_ACTIVE = {
-      selectSol: (key) => {
-        currentSol = key; measured = {}; unkMeasured = null;
-        const sol = SOLS[key];
-        let btns = sol.conc.map((c, i) => `<button class="btn secondary" onclick="window.LABOPC_ACTIVE.measure(${i})" style="font-size:0.8rem;">C=${c}</button>`).join('');
-        btns += `<button class="btn" style="border:2px dashed #e65100;background:#fff3e0;color:#e65100;" onclick="window.LABOPC_ACTIVE.measure(-1)">❓ Inconnue</button>`;
-        
-        document.getElementById('spec-area').innerHTML = `
-          <div class="sim-layout">
-            <div class="montage-frame">
-              <svg width="300" height="200" viewBox="0 0 300 200">
-                <rect x="20" y="20" width="260" height="160" fill="#2c3e50" rx="10"/>
-                <circle cx="50" cy="100" r="15" fill="#ffeb3b"/>
-                <text x="50" y="140" fill="#fff" font-size="10" text-anchor="middle">Source</text>
-                <rect x="90" y="80" width="10" height="40" fill="#111"/>
-                <rect x="150" y="60" width="40" height="100" fill="#111" rx="4"/>
-                <rect x="155" y="80" width="30" height="60" fill="${sol.color}" opacity="0.8"/>
-                <rect x="230" y="80" width="20" height="40" fill="#0a1a12"/>
-                <text x="240" y="140" fill="#6ee7b7" font-family="monospace" font-size="12" text-anchor="middle">A = ${unkMeasured ? unkMeasured.toFixed(3) : '0.000'}</text>
-                <line x1="65" y1="100" x2="150" y2="100" stroke="#ffeb3b" stroke-width="2" stroke-dasharray="5,5"/>
-                <line x1="190" y1="100" x2="230" y2="100" stroke="#ffeb3b" stroke-width="2" stroke-dasharray="5,5"/>
-              </svg>
-            </div>
-            <div class="controls-panel">
-              <h3 style="margin-top:0;">Mesures :</h3><div style="display:flex;gap:8px;flex-wrap:wrap;margin-bottom:15px;">${btns}</div>
-              <div id="spec-table"></div>
-            </div>
-          </div>
-          <canvas id="spectro-canvas" width="600" height="300"></canvas>
-          <div id="spec-steps"></div>
-        `;
-        update();
-      },
-      measure: (idx) => {
-        measure(idx);
-        const sol = SOLS[currentSol];
-        let sumX=0, sumY=0, sumXY=0, sumX2=0, n=0;
-        sol.conc.forEach((c, i) => {
-          if (i > 0 && measured[i] !== undefined) {
-            sumX+=c; sumY+=measured[i]; sumXY+=c*measured[i]; sumX2+=c*c; n++;
-          }
-        });
-        
-        if (unkMeasured && n >= 3) {
-          const a = (n*sumXY - sumX*sumY) / (n*sumX2 - sumX*sumX);
-          const b = (sumY - a*sumX) / n;
-          const C_unk = (unkMeasured - b) / a;
-          
-          document.getElementById('spec-steps').innerHTML = `
-            <div class="steps-container">
-              <h3>🧮 Démarche détaillée</h3>
-              <div class="step-item"><div class="step-number">1</div><div class="step-body"><div class="step-title">Loi de Beer-Lambert</div><div class="step-formula">A = k × C</div></div></div>
-              <div class="step-item"><div class="step-number">2</div><div class="step-body"><div class="step-title">Droite d'étalonnage (régression sur les points > 0)</div><div class="step-calc">A = ${a.toFixed(2)} × C + ${b.toFixed(3)}</div></div></div>
-              <div class="step-item"><div class="step-number">3</div><div class="step-body"><div class="step-title">Calcul de la concentration inconnue</div><div class="step-calc">C = (A - b) / a = (${unkMeasured.toFixed(3)} - ${b.toFixed(3)}) / ${a.toFixed(2)}</div><div class="result-box"><p class="big">C = ${C_unk.toFixed(2)} ${sol.unit}</p></div></div></div>
-            </div>
-          `;
-        }
-      }
-    };
-    return function cleanup() { delete window.LABOPC_ACTIVE; };
+    return etalonnage(container, { mode: 'spec', sols: [
+      { n: 'Permanganate de potassium (K⁺ + MnO₄⁻)', col: '#7b1fa2', l0: 525, w: 45, eps: 2300, stock: 2.5e-3, vf: 50, vols: [2, 4, 6, 8, 10] },
+      { n: 'Sulfate de cuivre(II) (Cu²⁺ + SO₄²⁻)', col: '#1565c0', l0: 810, w: 130, eps: 12, stock: 0.5, vf: 50, vols: [2, 4, 6, 8, 10] },
+      { n: 'Ion thiocyanatofer(III) [Fe(SCN)]²⁺', col: '#c62828', l0: 460, w: 60, eps: 4700, stock: 1e-3, vf: 50, vols: [2, 4, 6, 8, 10] }] });
   }},
-
-  // --- CONDUCTIMÉTRIE ---
   conducto: { domain: 'chimie', icon: '⚡', render: function(container, lang) {
-    const SOLS = {
-      nacl: { name: "NaCl", k: 0.1264, unit: "mmol/L", conc: [0, 2, 4, 6, 8, 10], unk: 6.5 },
-      kcl: { name: "KCl", k: 0.1498, unit: "mmol/L", conc: [0, 2, 4, 6, 8, 10], unk: 7.2 },
-      cuso4: { name: "CuSO₄", k: 0.2672, unit: "mmol/L", conc: [0, 1, 2, 3, 4, 5], unk: 2.4 },
-      cacl2: { name: "CaCl₂", k: 0.2716, unit: "mmol/L", conc: [0, 1, 2, 3, 4, 5], unk: 3.1 }
-    };
-    let currentSol = null, measured = {}, unkMeasured = null;
-    
-    function draw() {
-      const canvas = document.getElementById('cond-canvas'); if(!canvas) return;
-      const sol = SOLS[currentSol]; const ctx = canvas.getContext('2d');
-      const W = canvas.width = 600, H = canvas.height = 300;
-      const padL = 60, padB = 40, padT = 20, padR = 20;
-      const plotW = W-padL-padR, plotH = H-padT-padB;
-      ctx.clearRect(0,0,W,H); ctx.fillStyle = '#fff'; ctx.fillRect(0,0,W,H);
-      
-      ctx.strokeStyle = '#eee'; ctx.lineWidth = 1;
-      for(let i=0; i<=5; i++) { ctx.beginPath(); ctx.moveTo(padL, padT+i*plotH/5); ctx.lineTo(W-padR, padT+i*plotH/5); ctx.stroke(); }
-      ctx.beginPath(); ctx.moveTo(padL, H-padB); ctx.lineTo(W-padR, H-padB); ctx.moveTo(padL, H-padB); ctx.lineTo(padL, padT); ctx.strokeStyle = '#333'; ctx.lineWidth = 2; ctx.stroke();
-      
-      ctx.fillStyle = '#444'; ctx.font = '12px Segoe UI'; ctx.textAlign = 'center'; ctx.fillText(`C (${sol.unit})`, W/2, H-10);
-      ctx.save(); ctx.translate(15, H/2); ctx.rotate(-Math.PI/2); ctx.fillText('σ (mS/cm)', 0, 0); ctx.restore();
-      
-      ctx.strokeStyle = '#e63946'; ctx.lineWidth = 2;
-      ctx.beginPath();
-      const maxC = sol.conc[sol.conc.length-1];
-      const maxS = sol.k * maxC;
-      ctx.moveTo(padL, H - padB);
-      ctx.lineTo(padL + plotW, H - padB - (maxS/3.0)*plotH);
-      ctx.stroke();
-
-      ctx.fillStyle = '#2c5364';
-      Object.keys(measured).forEach(k => {
-        const c = sol.conc[k]; const s = measured[k];
-        const x = padL + (c/maxC)*plotW;
-        const y = H - padB - (s/3.0)*plotH;
-        ctx.beginPath(); ctx.arc(x, y, 5, 0, 2*Math.PI); ctx.fill();
-      });
-      if (unkMeasured) {
-        const x = padL + (sol.unk/maxC)*plotW;
-        const y = H - padB - (unkMeasured/3.0)*plotH;
-        ctx.fillStyle = '#e65100'; ctx.beginPath(); ctx.arc(x, y, 7, 0, 2*Math.PI); ctx.fill();
-      }
-    }
-    
-    function update() {
-      const sol = SOLS[currentSol];
-      let table = `<table><tr><th>C (${sol.unit})</th><th>σ (mS/cm)</th></tr>`;
-      sol.conc.forEach((c, i) => { table += `<tr><td>${c}</td><td>${measured[i] !== undefined ? measured[i].toFixed(3) : '—'}</td></tr>`; });
-      table += `<tr style="background:#fff3e0;"><td>Inconnue</td><td>${unkMeasured ? unkMeasured.toFixed(3) : '—'}</td></tr></table>`;
-      document.getElementById('cond-table').innerHTML = table; draw();
-    }
-    
-    function measure(idx) {
-      const sol = SOLS[currentSol];
-      const trueS = idx === -1 ? (sol.k * sol.unk) : (sol.k * sol.conc[idx]);
-      const noise = idx === 0 ? 0 : (Math.random() - 0.5) * 0.02 * trueS;
-      const val = Math.max(0, trueS + noise);
-      if (idx === -1) unkMeasured = val; else measured[idx] = val;
-      update();
-    }
-    
-    container.innerHTML = `
-      <div class="info-box">Choisissez une solution, mesurez les étalons, puis l'inconnue.</div>
-      <div class="choices">
-        <div class="card" onclick="window.LABOPC_ACTIVE.selectSol('nacl')"><div class="title">NaCl</div></div>
-        <div class="card" onclick="window.LABOPC_ACTIVE.selectSol('kcl')"><div class="title">KCl</div></div>
-        <div class="card" onclick="window.LABOPC_ACTIVE.selectSol('cuso4')"><div class="title">CuSO₄</div></div>
-        <div class="card" onclick="window.LABOPC_ACTIVE.selectSol('cacl2')"><div class="title">CaCl₂</div></div>
-      </div>
-      <div id="cond-area"></div>
-    `;
-    
-    window.LABOPC_ACTIVE = {
-      selectSol: (key) => {
-        currentSol = key; measured = {}; unkMeasured = null;
-        const sol = SOLS[key];
-        let btns = sol.conc.map((c, i) => `<button class="btn secondary" onclick="window.LABOPC_ACTIVE.measure(${i})" style="font-size:0.8rem;">C=${c}</button>`).join('');
-        btns += `<button class="btn" style="border:2px dashed #e65100;background:#fff3e0;color:#e65100;" onclick="window.LABOPC_ACTIVE.measure(-1)">❓ Inconnue</button>`;
-        
-        document.getElementById('cond-area').innerHTML = `
-          <div class="sim-layout">
-            <div class="montage-frame">
-              <svg width="300" height="200" viewBox="0 0 300 200">
-                <rect x="20" y="20" width="260" height="160" fill="#2c3e50" rx="10"/>
-                <rect x="40" y="50" width="80" height="40" fill="#0a0a1a" rx="4"/>
-                <text x="80" y="75" fill="#64b5f6" font-family="monospace" font-size="16" text-anchor="middle">σ = ${unkMeasured ? unkMeasured.toFixed(3) : '0.000'}</text>
-                <rect x="160" y="40" width="80" height="100" fill="#f0f4f8" stroke="#7a8fa3" stroke-width="2" rx="4"/>
-                <rect x="165" y="80" width="70" height="55" fill="#b3e5fc" opacity="0.8"/>
-                <rect x="180" y="40" width="8" height="80" fill="#546e7a"/>
-                <rect x="210" y="40" width="8" height="80" fill="#546e7a"/>
-              </svg>
-            </div>
-            <div class="controls-panel">
-              <h3 style="margin-top:0;">Mesures :</h3><div style="display:flex;gap:8px;flex-wrap:wrap;margin-bottom:15px;">${btns}</div>
-              <div id="cond-table"></div>
-            </div>
-          </div>
-          <canvas id="cond-canvas" width="600" height="300"></canvas>
-          <div id="cond-steps"></div>
-        `;
-        update();
-      },
-      measure: (idx) => {
-        measure(idx);
-        const sol = SOLS[currentSol];
-        let sumX=0, sumY=0, sumXY=0, sumX2=0, n=0;
-        sol.conc.forEach((c, i) => {
-          if (i > 0 && measured[i] !== undefined) {
-            sumX+=c; sumY+=measured[i]; sumXY+=c*measured[i]; sumX2+=c*c; n++;
-          }
-        });
-        if (unkMeasured && n >= 3) {
-          const a = (n*sumXY - sumX*sumY) / (n*sumX2 - sumX*sumX);
-          const b = (sumY - a*sumX) / n;
-          const C_unk = (unkMeasured - b) / a;
-          
-          document.getElementById('cond-steps').innerHTML = `
-            <div class="steps-container">
-              <h3>🧮 Démarche détaillée</h3>
-              <div class="step-item"><div class="step-number">1</div><div class="step-body"><div class="step-title">Loi de Kohlrausch</div><div class="step-formula">σ = k × C</div></div></div>
-              <div class="step-item"><div class="step-number">2</div><div class="step-body"><div class="step-title">Droite d'étalonnage (régression)</div><div class="step-calc">σ = ${a.toFixed(2)} × C + ${b.toFixed(3)}</div></div></div>
-              <div class="step-item"><div class="step-number">3</div><div class="step-body"><div class="step-title">Calcul de la concentration inconnue</div><div class="step-calc">C = (σ - b) / a = (${unkMeasured.toFixed(3)} - ${b.toFixed(3)}) / ${a.toFixed(2)}</div><div class="result-box"><p class="big">C = ${C_unk.toFixed(2)} ${sol.unit}</p></div></div></div>
-            </div>
-          `;
-        }
-      }
-    };
-    return function cleanup() { delete window.LABOPC_ACTIVE; };
+    return etalonnage(container, { mode: 'cond', sols: [
+      { n: 'Chlorure de sodium (Na⁺ + Cl⁻)', lam: 12.64, stock: 0.05, vf: 100, vols: [5, 10, 15, 20, 25] },
+      { n: 'Chlorure de potassium (K⁺ + Cl⁻)', lam: 14.98, stock: 0.05, vf: 100, vols: [5, 10, 15, 20, 25] },
+      { n: 'Chlorure de calcium (Ca²⁺ + 2 Cl⁻)', lam: 27.16, stock: 0.02, vf: 100, vols: [5, 10, 15, 20, 25] }] });
   }},
-
-  // --- TITRAGE (Menu + 3 Exemples) ---
   titrage: { domain: 'chimie', icon: '💧', render: function(container, lang) {
-    const EXOS = {
-      phmetrique: [
-        { name: "HCl / NaOH", type: "fort" },
-        { name: "CH₃COOH / NaOH", type: "faible", pKa: 4.76 },
-        { name: "NH₄⁺ / NaOH", type: "faible", pKa: 9.25 }
-      ],
-      conductometrique: [
-        { name: "NaCl / AgNO₃", type: "precip" },
-        { name: "HCl / NaOH", type: "acide_base" },
-        { name: "CH₃COOH / NH₃", type: "acide_base" }
-      ],
-      colorimetrique: [
-        { name: "HCl / NaOH (Hélianthine)", indicator: "helianthine" },
-        { name: "CH₃COOH / NaOH (Phénolphtaléine)", indicator: "phenolphtaleine" },
-        { name: "Fe²⁺ / MnO₄⁻ (Auto-indicateur)", indicator: "auto" }
-      ]
-    };
-    
-    let currentMode = null, currentExo = null, vol = 0, eqVol = 20, running = false, animId = null;
-    
-    function calcPH(v, type, pKa) {
-      const Va = 20, Ca = 0.1, Cb = 0.1, n = Va + v, a = Ca * Va / n, b = Cb * v / n;
-      const K = type === 'fort' ? 1e7 : Math.pow(10, -pKa);
-      let lo = -1, hi = 15;
+    const L = { H: 34.98, OH: 19.92, Na: 5.01, Cl: 7.63, Ac: 4.09, NH4: 7.34, Ag: 6.19, NO3: 7.14 };
+    const IND = [
+      { n: 'Hélianthine', lo: 3.1, hi: 4.4, a: '#e04a35', b: '#f3d02a' },
+      { n: 'Bleu de bromothymol', lo: 6.0, hi: 7.6, a: '#f0d52b', b: '#2f6fd6' },
+      { n: 'Phénolphtaléine', lo: 8.2, hi: 10.0, a: '#f3f7f8', b: '#d6338c' }];
+    const SYS = [
+      { id: 'hcl', n: 'HCl (acide fort) titré par NaOH', k: 'a', pKa: -7, la: L.Cl, lc: L.Na, ct: [0.05, 0.1, 0.2], tit: 'NaOH', eq: 'H₃O⁺ + HO⁻ → 2 H₂O', modes: ['ph', 'cond', 'col'] },
+      { id: 'ac', n: 'CH₃COOH (acide faible) titré par NaOH', k: 'a', pKa: 4.76, la: L.Ac, lc: L.Na, ct: [0.05, 0.1, 0.2], tit: 'NaOH', eq: 'CH₃COOH + HO⁻ → CH₃COO⁻ + H₂O', modes: ['ph', 'cond', 'col'] },
+      { id: 'nh3', n: 'NH₃ (base faible) titrée par HCl', k: 'b', pKa: 9.25, la: L.Cl, lc: L.NH4, ct: [0.05, 0.1, 0.2], tit: 'HCl', eq: 'NH₃ + H₃O⁺ → NH₄⁺ + H₂O', modes: ['ph', 'cond', 'col'] },
+      { id: 'ag', n: 'NaCl titré par AgNO₃ (précipitation)', k: 'ag', ct: [0.05, 0.1], tit: 'AgNO₃', eq: 'Ag⁺ + Cl⁻ → AgCl(s)', modes: ['cond'] },
+      { id: 'fe', n: 'Fe²⁺ titré par MnO₄⁻ (milieu acide)', k: 'fe', ct: [0.01, 0.02], tit: 'KMnO₄', eq: 'MnO₄⁻ + 5 Fe²⁺ + 8 H⁺ → Mn²⁺ + 5 Fe³⁺ + 4 H₂O', modes: ['col'] }];
+    const $ = (s) => container.querySelector(s);
+    const hx = (c) => [1, 3, 5].map((i) => parseInt(c.slice(i, i + 2), 16));
+    const mix = (a, b, t) => { const p = hx(a), q = hx(b); return 'rgb(' + p.map((v, i) => Math.round(v + (q[i] - v) * t)).join(',') + ')'; };
+    const nz = () => (Math.random() + Math.random() + Math.random() - 1.5) / 1.5;
+    const fr = (v, d) => v.toFixed(d).replace('.', ',');
+    const eqV = (s, Ca, Ct, Va) => Ca * Va / Ct / (s.k === 'fe' ? 5 : 1);
+    function chem(s, Ca, Ct, Va, V) {
+      const n = Va + V, a = Ca * Va / n, b = Ct * V / n;
+      if (s.k === 'ag') { const bef = Ct * V <= Ca * Va; return { sig: 10 * (L.Na * a + L.NO3 * b + L.Cl * (bef ? a - b : 0) + L.Ag * (bef ? 0 : b - a)) }; }
+      if (s.k === 'fe') return {};
+      const K = Math.pow(10, -s.pKa), A = s.k === 'a'; let lo = -1, hi = 15;
       for (let i = 0; i < 60; i++) {
         const m = (lo + hi) / 2, h = Math.pow(10, -m);
-        if (b + h - 1e-14 / h - a * K / (K + h) > 0) lo = m; else hi = m;
+        const f = A ? b + h - 1e-14 / h - a * K / (K + h) : a * h / (K + h) + h - 1e-14 / h - b;
+        if (f > 0) lo = m; else hi = m;
       }
-      return (lo + hi) / 2;
+      const pH = (lo + hi) / 2, h = Math.pow(10, -pH), cat = A ? b : a * h / (K + h), an = A ? a * K / (K + h) : b;
+      return { pH, sig: 10 * (s.lc * cat + s.la * an + L.H * h + L.OH * 1e-14 / h) };
     }
-
+    let st = null, flow = null, stir = null;
+    const stopAll = () => { clearInterval(flow); clearInterval(stir); flow = stir = null; };
+    const onResize = () => draw();
+    window.addEventListener('resize', onResize);
+    function menu() {
+      stopAll();
+      container.innerHTML = '<h3>Choisissez la méthode de titrage</h3><div class="choices">' + [['ph', '📈', 'Titrage pH-métrique', 'Suivi du pH, méthode des tangentes'], ['cond', '⚡', 'Titrage conductimétrique', 'Suivi de σ, rupture de pente'], ['col', '🎨', 'Titrage colorimétrique', 'Changement de couleur persistant']].map((m) => '<div class="card" data-m="' + m[0] + '"><div class="icon">' + m[1] + '</div><div class="title">' + m[2] + '</div><div class="desc">' + m[3] + '</div></div>').join('') + '</div>';
+      container.querySelectorAll('.card').forEach((c) => c.addEventListener('click', () => systems(c.dataset.m)));
+    }
+    function systems(mode) {
+      container.innerHTML = '<div class="back-bar"><button class="btn secondary" id="bk">← Méthodes</button></div><h3>Choisissez le système à titrer</h3><div class="choices">' + SYS.filter((s) => s.modes.includes(mode)).map((s) => '<div class="card" data-id="' + s.id + '"><div class="title">' + s.n + '</div><div class="desc">' + s.eq + '</div></div>').join('') + '</div>';
+      $('#bk').addEventListener('click', menu);
+      container.querySelectorAll('.card').forEach((c) => c.addEventListener('click', () => setup(mode, SYS.find((s) => s.id === c.dataset.id))));
+    }
+    function setup(mode, s) {
+      const ci = mode === 'col' && (s.k === 'a' || s.k === 'b');
+      container.innerHTML = '<div class="back-bar"><button class="btn secondary" id="bk">← Systèmes</button></div><h3>' + s.n + '</h3><div class="info-box">' + s.eq + '<br>La concentration de la solution à titrer est inconnue : elle est tirée au hasard.</div>' +
+        '<div class="input-group"><label>Titrant ' + s.tit + ' :</label><select id="ct">' + s.ct.map((c, i) => '<option value="' + c + '"' + (i === 1 ? ' selected' : '') + '>' + fr(c, c < 0.1 ? 3 : 2) + ' mol/L</option>').join('') + '</select><label>Prise d’essai :</label><select id="va"><option value="10">10 mL</option><option value="20" selected>20 mL</option></select></div>' +
+        (ci ? '<div class="input-group"><label>Indicateur coloré :</label><select id="ind">' + IND.map((x, i) => '<option value="' + i + '">' + x.n + ' (zone de virage ' + fr(x.lo, 1) + '–' + fr(x.hi, 1) + ')</option>').join('') + '</select></div>' : '') +
+        '<button class="btn success" id="go">Préparer le montage</button>';
+      $('#bk').addEventListener('click', () => systems(mode));
+      $('#go').addEventListener('click', () => {
+        if (!$('#ct')) return;
+        const Ct = +$('#ct').value, Va = +$('#va').value, Vt = 8 + Math.random() * 14;
+        start({ mode, s, Ct, Va, Ca: +((s.k === 'fe' ? 5 : 1) * Ct * Vt / Va).toPrecision(3), ind: ci ? IND[+$('#ind').value] : null });
+      });
+    }
+    function svg(p) {
+      const tk = [0, 5, 10, 15, 20, 25].map((v) => { const y = 32 + v * 236 / 25; return '<line x1="172" x2="180" y1="' + y + '" y2="' + y + '" stroke="#455a64"/><text x="184" y="' + (y + 4) + '" font-size="9" fill="#455a64">' + v + '</text>'; }).join('');
+      const probe = p.mode === 'ph' ? '<rect x="196" y="290" width="7" height="76" fill="#546e7a"/><rect x="190" y="268" width="19" height="24" rx="3" fill="#455a64"/>' : p.mode === 'cond' ? '<rect x="194" y="290" width="4" height="72" fill="#78909c"/><rect x="202" y="290" width="4" height="72" fill="#78909c"/><rect x="190" y="268" width="20" height="24" rx="3" fill="#455a64"/>' : '';
+      return '<svg viewBox="0 0 300 400" width="300" style="max-width:100%;height:auto"><rect x="20" y="384" width="160" height="12" rx="3" fill="#78909c"/><rect x="52" y="30" width="9" height="356" fill="#90a4ae"/><rect x="61" y="95" width="92" height="7" fill="#78909c"/>' +
+        '<rect x="150" y="30" width="22" height="240" rx="3" fill="rgba(200,220,235,.35)" stroke="#7a8fa3" stroke-width="1.5"/><rect id="bl" x="152" y="32" width="18" height="236" fill="#9ccc65" opacity=".85"/>' + tk +
+        '<rect x="148" y="270" width="30" height="12" rx="2" fill="#546e7a"/><path d="M158 282 L168 282 L164 300 L162 300Z" fill="#b0bec5"/>' +
+        '<path d="M115 310 L115 365 Q115 372 122 372 L205 372 Q212 372 212 365 L212 310" fill="rgba(200,220,235,.25)" stroke="#7a8fa3" stroke-width="2"/><path id="lq" d="M117 340 L117 364 Q117 370 123 370 L204 370 Q210 370 210 364 L210 340Z" fill="#cfe8f6" opacity=".9"/>' +
+        '<ellipse id="bar" cx="163" cy="366" rx="13" ry="3" fill="#fff" stroke="#999"/><rect x="95" y="374" width="140" height="10" rx="3" fill="#37474f"/>' + probe + '</svg>';
+    }
+    function colorNow(p, V) {
+      if (p.s.k === 'fe') return mix('#eef0c8', '#b4189a', Math.min(1, Math.max(0, p.Ct * (V - p.Ve) / (p.Va + V)) / 1.5e-4));
+      if (p.ind) { const pH = chem(p.s, p.Ca, p.Ct, p.Va, V).pH; return mix(p.ind.a, p.ind.b, Math.min(1, Math.max(0, (pH - p.ind.lo) / (p.ind.hi - p.ind.lo)))); }
+      return '#cfe8f6';
+    }
+    function start(p) {
+      stopAll(); p.Ve = eqV(p.s, p.Ca, p.Ct, p.Va);
+      let ym = 1; if (p.mode === 'cond') for (let V = 0; V <= 25; V += 0.25) ym = Math.max(ym, chem(p.s, p.Ca, p.Ct, p.Va, V).sig * 1.1);
+      st = { p, V: 0, pts: [], cur: null, rev: false, ym };
+      const col = p.mode === 'col';
+      container.innerHTML = '<div class="back-bar"><button class="btn secondary" id="bk">← Réglages</button></div><h3>' + p.s.n + ' — ' + p.Va + ' mL, titrant ' + fr(p.Ct, p.Ct < 0.1 ? 3 : 2) + ' mol/L</h3>' +
+        '<div class="sim-layout"><div class="montage-frame">' + svg(p) + '</div><div class="controls-panel"><div class="live-readout"><div class="lbl">VOLUME VERSÉ</div><div id="vol"></div></div>' +
+        (col ? '' : '<div class="live-readout"><div class="lbl">' + (p.mode === 'ph' ? 'pH-MÈTRE' : 'CONDUCTIMÈTRE (mS/cm)') + '</div><div id="read"></div></div>') +
+        '<div style="display:flex;flex-wrap:wrap;gap:6px"><button class="btn" id="b05">1 goutte (0,05 mL)</button><button class="btn" id="b1">+ 0,1 mL</button><button class="btn" id="b10">+ 1 mL</button><button class="btn success" id="tap">Ouvrir le robinet</button>' + (col ? '' : '<button class="btn success" id="note">Noter la mesure</button>') + '<button class="btn danger" id="rst">Recommencer</button></div></div></div>' +
+        (col ? '<div class="info-box">Repère le volume où la couleur change de façon persistante, puis saisis-le ci-dessous.</div>' : '<canvas id="cv"></canvas><div class="tw" style="max-height:220px;overflow:auto"><table><tr><th>V (mL)</th><th>' + (p.mode === 'ph' ? 'pH' : 'σ (mS/cm)') + '</th></tr><tbody id="tb"></tbody></table></div>') +
+        '<div class="input-group"><label>V<sub>E</sub> repéré =</label><input type="text" id="ve" inputmode="decimal" placeholder="ex : 12,3"> mL <button class="btn success" id="val">Valider et calculer C</button></div><div id="res"></div>';
+      $('#bk').addEventListener('click', () => { stopAll(); setup(p.mode, p.s); });
+      $('#b05').addEventListener('click', () => add(0.05)); $('#b1').addEventListener('click', () => add(0.1)); $('#b10').addEventListener('click', () => add(1));
+      $('#tap').addEventListener('click', () => {
+        if (flow) { clearInterval(flow); flow = null; $('#tap').textContent = 'Ouvrir le robinet'; return; }
+        $('#tap').textContent = 'Fermer le robinet';
+        flow = setInterval(() => { add(0.1); if (st.V >= 25) { clearInterval(flow); flow = null; $('#tap').textContent = 'Ouvrir le robinet'; } }, 150);
+      });
+      if (!col) $('#note').addEventListener('click', note);
+      $('#rst').addEventListener('click', () => start(p)); $('#val').addEventListener('click', validate);
+      stir = setInterval(() => { const b = $('#bar'); if (b) b.setAttribute('rx', 4 + Math.abs(Math.sin(Date.now() / 90)) * 9); }, 60);
+      measure(); upd(); draw();
+    }
+    function measure() { const p = st.p, o = chem(p.s, p.Ca, p.Ct, p.Va, st.V); st.cur = p.mode === 'ph' ? o.pH + 0.01 * nz() : p.mode === 'cond' ? o.sig * (1 + 0.005 * nz()) : null; }
+    function add(dv) { if (st.V >= 25) return; st.V = Math.min(25, +(st.V + dv).toFixed(2)); measure(); upd(); }
+    function upd() {
+      if (!st || !$('#vol')) return;
+      const p = st.p, V = st.V, t = 340 - V * 0.8;
+      $('#vol').textContent = fr(V, 2) + ' mL';
+      if ($('#read')) $('#read').textContent = p.mode === 'ph' ? fr(st.cur, 2) : fr(st.cur, 3);
+      $('#bl').setAttribute('y', 32 + V * 236 / 25); $('#bl').setAttribute('height', 236 - V * 236 / 25);
+      $('#lq').setAttribute('d', 'M117 ' + t + ' L117 364 Q117 370 123 370 L204 370 Q210 370 210 364 L210 ' + t + 'Z'); $('#lq').setAttribute('fill', colorNow(p, V));
+    }
+    function note() {
+      if (!st || !$('#tb')) return;
+      st.pts.push([st.V, st.cur]); st.pts.sort((a, b) => a[0] - b[0]);
+      $('#tb').innerHTML = st.pts.map((q) => '<tr><td>' + fr(q[0], 2) + '</td><td>' + fr(q[1], st.p.mode === 'ph' ? 2 : 3) + '</td></tr>').join(''); draw();
+    }
     function draw() {
-      const canvas = document.getElementById('tit-canvas'); if(!canvas) return;
-      const ctx = canvas.getContext('2d');
-      const W = canvas.width = 600, H = canvas.height = 300;
-      const padL = 60, padB = 40, padT = 20, padR = 20;
-      const plotW = W-padL-padR, plotH = H-padT-padB;
-      ctx.clearRect(0,0,W,H); ctx.fillStyle = '#fff'; ctx.fillRect(0,0,W,H);
-      
-      ctx.beginPath(); ctx.moveTo(padL, H-padB); ctx.lineTo(W-padR, H-padB); ctx.moveTo(padL, H-padB); ctx.lineTo(padL, padT); ctx.strokeStyle = '#333'; ctx.lineWidth = 2; ctx.stroke();
-      ctx.fillStyle = '#444'; ctx.font = '12px Segoe UI'; ctx.textAlign = 'center'; ctx.fillText('V (mL)', W/2, H-10);
-      ctx.save(); ctx.translate(15, H/2); ctx.rotate(-Math.PI/2); ctx.fillText(currentMode === 'phmetrique' ? 'pH' : 'σ (mS/cm)', 0, 0); ctx.restore();
-      
-      ctx.beginPath();
-      for (let v = 0; v <= vol; v += 0.1) {
-        let val;
-        if (currentMode === 'phmetrique') val = calcPH(v, currentExo.type, currentExo.pKa) / 14;
-        else val = (10 - v*0.3) / 14; // Modèle simplifié pour conducto
-        const x = padL + (v / 40) * plotW;
-        const y = H - padB - val * plotH;
-        if (v === 0) ctx.moveTo(x, y); else ctx.lineTo(x, y);
+      const cv = $('#cv'); if (!cv || !st) return;
+      const p = st.p, ph = p.mode === 'ph', r = window.devicePixelRatio || 1, W = cv.clientWidth || 600, H = 300, ym = ph ? 14 : st.ym;
+      cv.width = W * r; cv.height = H * r; cv.style.height = H + 'px';
+      const g = cv.getContext('2d'); g.setTransform(r, 0, 0, r, 0, 0);
+      const X = (v) => 55 + v / 25 * (W - 70), Y = (y) => H - 40 - y / ym * (H - 55);
+      g.clearRect(0, 0, W, H); g.font = '12px sans-serif'; g.lineWidth = 1;
+      for (let i = 0; i <= 5; i++) {
+        const xv = 5 * i, yv = ym * i / 5; g.strokeStyle = '#d6e4f0'; g.beginPath(); g.moveTo(X(xv), 15); g.lineTo(X(xv), H - 40); g.moveTo(55, Y(yv)); g.lineTo(W - 15, Y(yv)); g.stroke();
+        g.fillStyle = '#555'; g.textAlign = 'center'; g.fillText(xv, X(xv), H - 24); g.textAlign = 'right'; g.fillText(yv.toFixed(1), 48, Y(yv) + 4);
       }
-      ctx.strokeStyle = '#e63946'; ctx.lineWidth = 2.5; ctx.stroke();
-      
-      if (eqVol) {
-        const xEq = padL + (eqVol / 40) * plotW;
-        ctx.setLineDash([5,5]); ctx.beginPath(); ctx.moveTo(xEq, padT); ctx.lineTo(xEq, H-padB); ctx.strokeStyle = '#11998e'; ctx.lineWidth = 1.5; ctx.stroke(); ctx.setLineDash([]);
-      }
+      g.fillStyle = '#222'; g.textAlign = 'center'; g.fillText('V versé (mL)', W / 2, H - 6);
+      g.save(); g.translate(12, H / 2); g.rotate(-Math.PI / 2); g.fillText(ph ? 'pH' : 'σ (mS/cm)', 0, 0); g.restore();
+      if (st.rev) { g.strokeStyle = '#11998e'; g.setLineDash([6, 4]); g.beginPath(); g.moveTo(X(p.Ve), 15); g.lineTo(X(p.Ve), H - 40); g.stroke(); g.setLineDash([]); }
+      g.fillStyle = '#c0392b'; st.pts.forEach((q) => { g.beginPath(); g.arc(X(q[0]), Y(q[1]), 4, 0, 7); g.fill(); });
     }
-    
-    function update() {
-      document.getElementById('tit-vol').textContent = vol.toFixed(1) + ' mL';
-      const beaker = document.getElementById('beaker-liquid');
-      if (beaker) {
-        if (currentMode === 'colorimetrique') {
-          let pH = 7;
-          if (currentExo.indicator === 'helianthine') {
-            pH = calcPH(vol, 'fort');
-            if (pH < 3.1) beaker.setAttribute('fill', '#e53935');
-            else if (pH > 4.4) beaker.setAttribute('fill', '#fbc02d');
-            else beaker.setAttribute('fill', '#ffb74d');
-          } else if (currentExo.indicator === 'phenolphtaleine') {
-            pH = calcPH(vol, 'faible', 4.76);
-            if (pH < 8.2) beaker.setAttribute('fill', '#f5f5f5');
-            else if (pH > 9.8) beaker.setAttribute('fill', '#e91e63');
-            else beaker.setAttribute('fill', '#f48fb1');
-          } else {
-            beaker.setAttribute('fill', vol >= eqVol ? '#ce93d8' : '#c8e6c9');
-          }
-        } else {
-          beaker.setAttribute('fill', '#e0f2f1');
-        }
-      }
+    function validate() {
+      if (!st || !$('#ve')) return;
+      const p = st.p, ve = parseFloat($('#ve').value.replace(',', '.'));
+      if (!(ve > 0)) { $('#res').innerHTML = '<div class="warning-box">Saisis le volume équivalent repéré (en mL).</div>'; return; }
+      st.rev = true; const C = (p.s.k === 'fe' ? 5 : 1) * p.Ct * ve / p.Va, eV = Math.abs(ve - p.Ve) / p.Ve * 100;
+      $('#res').innerHTML = '<div class="result-box"><p>À l’équivalence : n(titré) = ' + (p.s.k === 'fe' ? '5 × ' : '') + 'n(titrant versé)</p><p class="big">C = ' + fr(C, 4) + ' mol/L</p><p class="small">Valeur attendue : ' + fr(p.Ca, 4) + ' mol/L · V<sub>E</sub> théorique = ' + fr(p.Ve, 2) + ' mL · écart sur V<sub>E</sub> : ' + fr(eV, 1) + ' %</p>' + (eV > 3 ? '<p>Resserre les mesures (tous les 0,1 mL) autour du saut pour mieux repérer V<sub>E</sub>.</p>' : '<p>Très bien : ton V<sub>E</sub> est cohérent.</p>') + '</div>';
       draw();
     }
-    
-    function loop() {
-      if (!running) return;
-      vol += 0.1;
-      if (vol >= 40) { vol = 40; running = false; document.getElementById('tit-btn').textContent = 'Terminé'; }
-      update();
-      if (running) animId = requestAnimationFrame(loop);
-    }
-    
-    function startExo(mode, exo) {
-      currentMode = mode; currentExo = exo; vol = 0; running = false; eqVol = 20;
-      document.getElementById('tit-menu').style.display = 'none';
-      document.getElementById('tit-sim').style.display = 'block';
-      
-      document.getElementById('tit-sim').innerHTML = `
-        <div class="back-bar"><button class="btn secondary" onclick="window.LABOPC_ACTIVE.menu()">← Changer</button></div>
-        <div class="sim-layout">
-          <div class="montage-frame">
-            <svg width="200" height="300" viewBox="0 0 200 300">
-              <rect x="20" y="270" width="120" height="15" fill="#b0bec5" rx="3"/>
-              <rect x="60" y="20" width="10" height="250" fill="#90a4ae"/>
-              <rect x="85" y="40" width="20" height="180" fill="#eaf4fa" stroke="#7a8fa3" stroke-width="2"/>
-              <rect x="87" y="100" width="16" height="118" fill="#11998e" opacity="0.6"/>
-              <rect x="80" y="220" width="30" height="15" fill="#546e7a" rx="2"/>
-              <path d="M 60 240 L 60 290 Q 60 295 65 295 L 125 295 Q 130 295 130 290 L 130 240" fill="#f0f4f8" stroke="#7a8fa3" stroke-width="2"/>
-              <rect id="beaker-liquid" x="62" y="260" width="66" height="33" fill="#e0f2f1" opacity="0.8"/>
-            </svg>
-          </div>
-          <div class="controls-panel">
-            <div class="live-readout"><div class="lbl">VOLUME</div><div id="tit-vol">0.0 mL</div></div>
-            <button class="btn success" id="tit-btn" onclick="window.LABOPC_ACTIVE.toggle()">▶ Ouvrir le robinet</button>
-          </div>
-        </div>
-        <canvas id="tit-canvas" width="600" height="300"></canvas>
-        <div id="tit-steps"></div>
-      `;
-      update();
-    }
-
-    container.innerHTML = `
-      <div id="tit-menu">
-        <div class="info-box">Choisissez un type de titrage.</div>
-        <div class="choices">
-          <div class="card" onclick="window.LABOPC_ACTIVE.showList('phmetrique')"><div class="title">pH-métrique</div></div>
-          <div class="card" onclick="window.LABOPC_ACTIVE.showList('conductometrique')"><div class="title">Conductimétrique</div></div>
-          <div class="card" onclick="window.LABOPC_ACTIVE.showList('colorimetrique')"><div class="title">Colorimétrique</div></div>
-        </div>
-        <div id="tit-list" style="margin-top:20px;"></div>
-      </div>
-      <div id="tit-sim" style="display:none;"></div>
-    `;
-    
-    window.LABOPC_ACTIVE = {
-      showList: (mode) => {
-        currentMode = mode;
-        let html = `<h3>Choisissez un exemple :</h3><div class="choices">`;
-        EXOS[mode].forEach(exo => {
-          html += `<div class="card" onclick="window.LABOPC_ACTIVE.start('${mode}', '${exo.name}')"><div class="title">${exo.name}</div></div>`;
-        });
-        html += `</div>`;
-        document.getElementById('tit-list').innerHTML = html;
-      },
-      start: (mode, name) => {
-        const exo = EXOS[mode].find(e => e.name === name);
-        startExo(mode, exo);
-      },
-      menu: () => {
-        document.getElementById('tit-menu').style.display = 'block';
-        document.getElementById('tit-sim').style.display = 'none';
-      },
-      toggle: () => {
-        running = !running;
-        document.getElementById('tit-btn').textContent = running ? '⏸ Fermer le robinet' : '▶ Ouvrir le robinet';
-        if (running) loop();
-        else if (animId) cancelAnimationFrame(animId);
-      }
-    };
-    return function cleanup() { running = false; if (animId) cancelAnimationFrame(animId); delete window.LABOPC_ACTIVE; };
+    menu();
+    return function cleanup() { stopAll(); window.removeEventListener('resize', onResize); };
   }},
-
-  // --- DISSOLUTION / DILUTION ---
   dissolution: { domain: 'chimie', icon: '⚖️', render: function(container, lang) {
     container.innerHTML = `
       <div class="info-box">Choisissez le type de préparation.</div>
