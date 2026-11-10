@@ -1,5 +1,5 @@
 /* LABOPC service worker — update CACHE_VERSION whenever a deployed asset changes. */
-const CACHE_VERSION = 'labopc-v6.7.0';
+const CACHE_VERSION = 'labopc-v6.8.0';
 const CACHE_STATIC = `${CACHE_VERSION}-static`;
 const CACHE_RUNTIME = `${CACHE_VERSION}-runtime`;
 const PRECACHE_URLS = [
